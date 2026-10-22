@@ -39,6 +39,9 @@ export function ReliabilityView({ offer, productTitle }: { offer: OfferView; pro
       </div>
 
       <p className="text-sm leading-7 text-foreground">{summary}</p>
+      <p className="-mt-2 text-xs leading-6 text-muted-foreground">
+        این امتیاز فقط تازگی و کامل‌بودن اطلاعات ثبت‌شده را می‌سنجد؛ احتمال آماری صحت قیمت یا واقعی‌بودن فروشگاه نیست.
+      </p>
 
       <dl className="flex flex-col gap-2">
         {signals.map((signal) => (
@@ -71,7 +74,9 @@ export function ReliabilityView({ offer, productTitle }: { offer: OfferView; pro
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
         <span>قیمت ثبت‌شده: {formatToman(offer.price)}</span>
-        <span>{jalaliDateTime(offer.changed_at)}</span>
+        <span>
+          {offer.changed_at ? `آخرین تغییر قیمت: ${jalaliDateTime(offer.changed_at)}` : "زمان به‌روزرسانی نامشخص"}
+        </span>
       </div>
     </div>
   );

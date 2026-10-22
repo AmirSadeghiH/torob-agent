@@ -17,8 +17,8 @@ export function PlanView({ plan, children }: { plan: Plan; children?: React.Reac
     <div className="flex flex-col gap-4 rounded-surface border-line border-border bg-card p-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat icon={Route} label="ایست" value={fa(plan.stops.length)} />
-        <Stat icon={MapPin} label="مسیر" value={distanceText(plan.total_distance_m)} />
-        <Stat icon={Clock} label="زمان تقریبی" value={`${fa(plan.visit_minutes)} دقیقه`} />
+        <Stat icon={MapPin} label="فاصلهٔ خط مستقیم" value={distanceText(plan.total_distance_m)} />
+        <Stat icon={Clock} label="تخمین زمان" value={`${fa(plan.visit_minutes)} دقیقه`} />
         <Stat icon={Wallet} label="جمع سبد" value={formatToman(plan.total)} />
       </div>
 
@@ -49,7 +49,7 @@ export function PlanView({ plan, children }: { plan: Plan; children?: React.Reac
                         {index === 0 ? "از نقطهٔ شروع" : "از ایست قبل"}
                       </span>
                     )}
-                    {stop.leg_minutes !== null && <span>· {fa(stop.leg_minutes)} دقیقه پیاده</span>}
+                    {stop.leg_minutes !== null && <span>· تخمین {fa(stop.leg_minutes)} دقیقه پیاده</span>}
                   </p>
                 </div>
                 <p className="text-sm font-semibold tabular-nums">{formatToman(stop.subtotal)}</p>
@@ -83,8 +83,9 @@ export function PlanView({ plan, children }: { plan: Plan; children?: React.Reac
           </p>
         ))}
         <p className="text-xs text-muted-foreground">
-          جمع {fa(plan.item_count)} قلم در {fa(plan.stops.length)} فروشگاه؛ مسیر با ترتیب نزدیک‌ترین ایست
-          چیده شده است.
+          جمع {fa(plan.item_count)} قلم در {fa(plan.stops.length)} فروشگاه؛ ایست‌ها به ترتیب نزدیک‌ترین چیده
+          شده‌اند. فاصله‌ها خط مستقیم بین مختصات و زمان‌ها تخمینی بر پایهٔ پیاده‌روی با سرعت ثابت است، نه
+          مسیریابی خیابانی.
         </p>
       </div>
 

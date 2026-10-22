@@ -7,6 +7,7 @@ import {
 import { haversineMeters } from "./lib/geo";
 import { dayHours, openNow, tehranNow, type DayKey } from "./lib/hours";
 import { normalizeFa, shorten } from "./lib/text";
+import { hasRegistryRecord, shopDisplayName, shopIdentity } from "./lib/identity";
 import { scoreOffer, type ReliabilityInput } from "./reliability";
 import type {
   CategoryInfo,
@@ -51,6 +52,8 @@ interface ProductRow {
   shop_hood: string | null;
   shop_lat: number | null;
   shop_lon: number | null;
+  shop_website: string | null;
+  shop_instagram: string | null;
   best_changed_at: string | null;
 }
 
@@ -68,7 +71,6 @@ interface OfferRow {
   address: string | null;
   lat: number | null;
   lon: number | null;
-  phone: string | null;
   hours: string;
   instagram: string | null;
   website: string | null;
@@ -83,7 +85,6 @@ interface ShopRow {
   lat: number | null;
   lon: number | null;
   categories: string;
-  phone: string | null;
   instagram: string | null;
   website: string | null;
   payments: string;
@@ -99,6 +100,7 @@ const PRODUCT_SELECT = `
   p.best_shop_id, p.newest_price_at,
   s.name AS shop_name, s.neighborhood AS shop_hood,
   s.lat AS shop_lat, s.lon AS shop_lon,
+  s.website AS shop_website, s.instagram AS shop_instagram,
   bo.changed_at AS best_changed_at`;
 
 const PRODUCT_JOINS = `
@@ -131,7 +133,11 @@ function mapProduct(row: ProductRow, origin: Origin | null = null, now = Date.no
         offer_id: row.best_offer_id!,
         price: row.best_price!,
         shop_id: row.best_shop_id ?? "",
-        shop_name: row.shop_name!,
+        shop_name: shopDisplayName(
+          row.best_shop_id ?? "",
+          row.shop_name,
+          hasRegistryRecord(row.shop_website, row.shop_instagram),
+        ),
         neighborhood: row.shop_hood,
         changed_at: row.best_changed_at,
         age_days: ageDays(row.best_changed_at, now),
@@ -155,20 +161,26 @@ function mapProduct(row: ProductRow, origin: Origin | null = null, now = Date.no
 }
 
 function storeRef(row: OfferRow | ShopRow, origin: Origin | null): StoreRef {
-  const name = "shop_name" in row ? row.shop_name : row.name;
+  const recorded = "shop_name" in row ? row.shop_name : row.name;
   return {
     shop_id: row.shop_id,
-    name,
+    name: shopDisplayName(row.shop_id, recorded, hasRegistryRecord(row.website, row.instagram)),
+    identity: shopIdentity(row.website, row.instagram),
     neighborhood: row.neighborhood,
     address: row.address,
     lat: row.lat,
     lon: row.lon,
-    phone: row.phone,
     distance_m: distanceTo(origin, row.lat, row.lon),
   };
 }
 
 // --------------------------------------------------------------------- meta
+
+function llmAgentConfigured(): boolean {
+  const enabled = (process.env.AI_AGENT_ENABLED ?? "").trim().toLowerCase();
+  const key = process.env.OPENAI_API_KEY ?? process.env.LLM_API_KEY ?? "";
+  return ["1", "true", "yes", "on"].includes(enabled) && key.trim().length > 0;
+}
 
 let metaCache: Meta | null = null;
 
@@ -235,8 +247,10 @@ export function getMeta(): Meta {
       priced_offers: pricedOffers ?? 0,
     },
     assistant: {
-      engine: "rules",
-      note: "برنامه‌ریزی و انتخاب ابزارها قطعی و بدون مدل زبانی انجام می‌شود.",
+      engine: llmAgentConfigured() ? "llm_agent" : "rules",
+      note: llmAgentConfigured()
+        ? "مدل زبانی ابزارها را انتخاب می‌کند؛ اگر در دسترس نباشد، موتور قطعی پاسخ می‌دهد."
+        : "برنامه‌ریزی و انتخاب ابزارها قطعی و بدون مدل زبانی انجام می‌شود.",
     },
   };
   if (counts?.products && counts.products !== metaCache.counts.products) {
@@ -499,7 +513,6 @@ function mapOffer(row: OfferRow, market: MarketStats, origin: Origin | null, now
     warranty: row.warranty_label,
     description: row.description,
     shop: {
-      phone: row.phone,
       has_hours: row.hours !== "{}" && row.hours !== "",
       has_website: Boolean(row.website),
       has_instagram: Boolean(row.instagram),
@@ -534,7 +547,7 @@ function offerRowsForProduct(productId: string, limit = 200): OfferRow[] {
   return all<OfferRow>(
     `SELECT o.offer_id, o.product_id, o.price, o.changed_at, o.title, o.warranty_label,
             o.description, s.shop_id, s.name AS shop_name, s.neighborhood, s.address,
-            s.lat, s.lon, s.phone, s.hours, s.instagram, s.website, s.categories
+            s.lat, s.lon, s.hours, s.instagram, s.website, s.categories
      FROM offers o JOIN shops s ON s.shop_id = o.shop_id
      WHERE o.product_id = ?
      ORDER BY o.price ASC, o.changed_at DESC
@@ -609,7 +622,7 @@ export function getOffer(offerId: string, origin: Origin | null = null): OfferVi
   const row = get<OfferRow>(
     `SELECT o.offer_id, o.product_id, o.price, o.changed_at, o.title, o.warranty_label,
             o.description, s.shop_id, s.name AS shop_name, s.neighborhood, s.address,
-            s.lat, s.lon, s.phone, s.hours, s.instagram, s.website, s.categories
+            s.lat, s.lon, s.hours, s.instagram, s.website, s.categories
      FROM offers o JOIN shops s ON s.shop_id = o.shop_id
      WHERE o.offer_id = ?`,
     [offerId],
@@ -642,12 +655,12 @@ function mapStore(row: ShopRow, origin: Origin | null, now = new Date()): StoreC
   const today = dayHours(hoursRaw, day);
   return {
     shop_id: row.shop_id,
-    name: row.name,
+    name: shopDisplayName(row.shop_id, row.name, hasRegistryRecord(row.website, row.instagram)),
+    identity: shopIdentity(row.website, row.instagram),
     neighborhood: row.neighborhood,
     address: row.address,
     lat: row.lat,
     lon: row.lon,
-    phone: row.phone,
     distance_m: distanceTo(origin, row.lat, row.lon),
     categories: parseJson<string[]>(row.categories, []).slice(0, 6),
     website: row.website,
@@ -795,7 +808,7 @@ export function getStoresSelling(input: SellingStoreInput): StoreCard[] {
   }
   const rows = all<ShopRow>(
     `SELECT s.shop_id, s.name, s.address, s.neighborhood, s.lat, s.lon, s.categories,
-            s.phone, s.instagram, s.website, s.payments, s.fast_delivery, s.hours,
+            s.instagram, s.website, s.payments, s.fast_delivery, s.hours,
             s.offer_count, COUNT(DISTINCT o.offer_id) AS matched_offers
      FROM shops s JOIN offers o ON o.shop_id = s.shop_id
      JOIN products p ON p.product_id = o.product_id
@@ -845,10 +858,12 @@ export function offersForPlan(ids: string[], origin: Origin | null): PlanOfferRo
     address: string | null;
     lat: number | null;
     lon: number | null;
-    phone: string | null;
+    website: string | null;
+    instagram: string | null;
   }>(
     `SELECT o.offer_id, o.price, o.changed_at, o.product_id, p.title, p.image,
-            s.shop_id, s.name AS shop_name, s.neighborhood, s.address, s.lat, s.lon, s.phone
+            s.shop_id, s.name AS shop_name, s.neighborhood, s.address, s.lat, s.lon,
+            s.website, s.instagram
      FROM offers o JOIN products p ON p.product_id = o.product_id
      JOIN shops s ON s.shop_id = o.shop_id
      WHERE o.offer_id IN (${placeholders})`,
@@ -867,12 +882,12 @@ export function offersForPlan(ids: string[], origin: Origin | null): PlanOfferRo
       image: r.image,
       shop: {
         shop_id: r.shop_id,
-        name: r.shop_name,
+        name: shopDisplayName(r.shop_id, r.shop_name, hasRegistryRecord(r.website, r.instagram)),
+        identity: shopIdentity(r.website, r.instagram),
         neighborhood: r.neighborhood,
         address: r.address,
         lat: r.lat,
         lon: r.lon,
-        phone: r.phone,
         distance_m: distanceTo(origin, r.lat, r.lon),
       },
     }));

@@ -13,7 +13,8 @@ interface Group {
 
 /**
  * Groups chosen offers by shop, orders the shops as a walkable route from the
- * origin, and surfaces what could go wrong (stale price, no phone, far stop).
+ * origin, and surfaces what could go wrong (stale price, far stop, split areas).
+ * Distances are straight-line between coordinates, never street routing.
  */
 export function buildPlan(offerIds: string[], origin: Origin): Plan | null {
   const rows = offersForPlan(offerIds, origin);
@@ -60,30 +61,25 @@ export function buildPlan(offerIds: string[], origin: Origin): Plan | null {
     (n, s) => n + s.items.filter((i) => i.freshness === "stale" || i.freshness === "old").length,
     0,
   );
-  const noPhone = stops.filter((s) => !s.shop.phone).length;
-
   const warnings: string[] = [];
   if (staleCount > 0) {
     warnings.push(
-      `قیمت ${fa(staleCount)} قلم قدیمی‌تر از یک ماه است؛ پیش از رفتن تلفنی تأیید بگیرید.`,
+      `قیمت ${fa(staleCount)} قلم قدیمی‌تر از یک ماه است؛ پیش از رفتن، قیمت و موجودی را از منبع دیگری بررسی کنید.`,
     );
-  }
-  if (noPhone > 0) {
-    warnings.push(`${fa(noPhone)} فروشگاه شمارهٔ تماس ثبت‌شده ندارد.`);
   }
   if (stops.length >= 4) {
     warnings.push("چهار ایست یا بیشتر در یک روز خسته‌کننده می‌شود؛ اگر شد، خرید را دو نوبت کنید.");
   }
   if (totalDistance > 5000) {
     warnings.push(
-      `مسیر حدود ${fa(Math.round(totalDistance / 1000))} کیلومتر پیاده‌روی دارد؛ برای بخشی از مسیر تاکسی بگیرید.`,
+      `فاصلهٔ خط مستقیم ایست‌ها حدود ${fa(Math.round(totalDistance / 1000))} کیلومتر است؛ مسافت واقعی خیابان بیشتر می‌شود، برای بخشی از مسیر تاکسی بگیرید.`,
     );
   }
   if (neighborhoods.length > 1) {
     warnings.push(`خرید در ${fa(neighborhoods.length)} محله پخش شده است: ${neighborhoods.join("، ")}.`);
   }
   if (warnings.length === 0) {
-    warnings.push("همهٔ ایست‌ها نزدیک هم‌اند و قیمت‌ها تازه‌اند؛ مسیر آمادهٔ رفتن است.");
+    warnings.push("فاصلهٔ مستقیم ایست‌ها کم است و تاریخ قیمت‌ها تازه است؛ مسیر آمادهٔ رفتن است.");
   }
 
   return {
@@ -103,5 +99,5 @@ export function buildPlan(offerIds: string[], origin: Origin): Plan | null {
 
 export function planSummary(plan: Plan): string {
   const shopCount = plan.stops.length;
-  return `${fa(shopCount)} فروشگاه، ${fa(plan.item_count)} قلم، جمع ${faNumber(plan.total)} تومان؛ حدود ${fa(plan.visit_minutes)} دقیقه با پیاده‌روی.`;
+  return `${fa(shopCount)} فروشگاه، ${fa(plan.item_count)} قلم، جمع ${faNumber(plan.total)} تومان؛ تخمین حدود ${fa(plan.visit_minutes)} دقیقه بر پایهٔ فاصلهٔ خط مستقیم.`;
 }

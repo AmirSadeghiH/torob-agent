@@ -360,16 +360,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         role: "user",
         text: trimmed,
       };
+      // Bounded history so «همین رو ارزون‌تر پیدا کن» keeps its subject.
+      const history = messages.slice(-6).map((message) => ({
+        role: message.role,
+        text: message.text,
+      }));
       setMessages((current) => [...current, userMessage].slice(-24));
       setSending(true);
       setError(null);
       try {
-        const response = await api.assistant(trimmed, {
-          ...context,
-          ...override,
-          origin,
-          offer_ids: basket.items.map((item) => item.offer_id),
-        });
+        const response = await api.assistant(
+          trimmed,
+          {
+            ...context,
+            ...override,
+            origin,
+            offer_ids: basket.items.map((item) => item.offer_id),
+          },
+          history,
+        );
         const assistantMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: "assistant",
@@ -386,7 +395,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setSending(false);
       }
     },
-    [basket.items, context, origin, sending],
+    [basket.items, context, messages, origin, sending],
   );
 
   const retry = useCallback(async () => {

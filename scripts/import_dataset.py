@@ -201,24 +201,11 @@ def warranty_label(raw: str | None) -> str | None:
     return None
 
 
-def phone_of(contacts) -> str | None:
-    if not isinstance(contacts, list):
-        return None
-    for c in contacts:
-        if not isinstance(c, dict):
-            continue
-        num = clean(str(c.get("display_number") or ""))
-        if not num:
-            continue
-        latin = "".join(
-            str(PERSIAN_DIGITS.index(ch)) if ch in PERSIAN_DIGITS
-            else str(ARABIC_DIGITS.index(ch)) if ch in ARABIC_DIGITS else ch
-            for ch in num
-        )
-        digits = "".join(ch for ch in latin if ch.isdigit())
-        if len(digits) >= 8:
-            return digits
-    return None
+# Challenge rules: every phone number in the dataset is synthetic. Contact
+# numbers are therefore never carried into the app database; the columns stay
+# for schema compatibility only.
+SYNTHETIC_CONTACTS = "[]"
+SYNTHETIC_PHONE = None
 
 
 def in_bbox(lat: float | None, lon: float | None) -> bool:
@@ -322,7 +309,6 @@ class Importer:
                 continue
             hood = clean(row.get("location_label"))
             cats = category_pairs(row.get("category_names"))
-            contacts = parse_json(row.get("contacts"), [])
             try:
                 lat = float(row.get("lat") or "")
                 lon = float(row.get("lon") or "")
@@ -338,8 +324,8 @@ class Importer:
                 normalize(hood) if hood else None, lat, lon,
                 json.dumps(cats, ensure_ascii=False),
                 normalize(" ".join(cats)),
-                json.dumps(contacts, ensure_ascii=False) if contacts else "[]",
-                phone_of(contacts),
+                SYNTHETIC_CONTACTS,
+                SYNTHETIC_PHONE,
                 clean(row.get("instagram")),
                 clean(row.get("website_url")),
                 json.dumps(payments, ensure_ascii=False) if payments else "[]",

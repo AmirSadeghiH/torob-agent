@@ -169,9 +169,22 @@ export function BlockView({ block }: { block: Block }) {
       return (
         <div className={cn("flex gap-2 rounded-xl border-line p-3 text-sm leading-7", tone.className)}>
           <tone.Icon className="mt-1 size-4 shrink-0" strokeWidth={1.5} aria-hidden />
-          <div>
+          <div className="min-w-0 flex-1">
             {block.title && <p className="font-medium text-foreground">{block.title}</p>}
             <p className={block.title ? "text-muted-foreground" : ""}>{block.body}</p>
+            {block.actions && block.actions.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {block.actions.map((action) => (
+                  <Link
+                    key={action.to}
+                    to={action.to}
+                    className="inline-flex h-10 items-center rounded-control border-line border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-accent"
+                  >
+                    {action.label}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       );

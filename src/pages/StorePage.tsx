@@ -6,7 +6,6 @@ import {
   Globe,
   Instagram,
   MapPin,
-  Phone,
   ShoppingBag,
   Truck,
 } from "lucide-react";
@@ -172,18 +171,13 @@ export function StorePage() {
 
           {shop.address && <p className="text-sm leading-7 text-muted-foreground">{shop.address}</p>}
 
+          <p className="rounded-lg bg-secondary p-2 text-xs leading-6 text-muted-foreground">
+            {shop.identity === "registered"
+              ? "نام و لینک‌های این فروشگاه از فیلدهای ثبت‌شدهٔ دیتاست است؛ تأیید مستقل کسب‌وکار نیست. شمارهٔ تلفن در این دیتاست معتبر نیست و نمایش داده نمی‌شود."
+              : "نام این فروشگاه در دیتاست ناشناس شده است؛ شناسهٔ کوتاه داخل نام فقط برای ارجاع پایدار است و شمارهٔ تماس معتبری برای آن وجود ندارد."}
+          </p>
+
           <div className="flex flex-wrap gap-2">
-            {shop.phone && (
-              <a
-                href={`tel:${shop.phone}`}
-                className="inline-flex h-11 items-center gap-2 rounded-control bg-brand px-4 text-sm font-medium text-brand-foreground"
-              >
-                <Phone className="size-4" strokeWidth={2} aria-hidden />
-                <span dir="ltr" className="tabular-nums">
-                  {fa(shop.phone)}
-                </span>
-              </a>
-            )}
             {website && (
               <a
                 href={website}

@@ -413,12 +413,24 @@ export function ExplorePage() {
         <ProductGridSkeleton count={6} />
       ) : items.length === 0 ? (
         <EmptyState
-          title="چیزی با این فیلترها پیدا نشد"
-          description="بودجه را کمی باز کنید، محله را بردارید یا دستهٔ دیگری را امتحان کنید."
+          title={maxPrice ? `در بودجهٔ تا ${formatToman(maxPrice)} چیزی پیدا نشد` : "چیزی با این فیلترها پیدا نشد"}
+          description="بودجه را بالاتر ببرید، محله را بردارید یا دستهٔ دیگری را امتحان کنید."
           action={
-            <Button variant="brand" onClick={() => setParams({}, { replace: true })}>
-              پاک کردن همهٔ فیلترها
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              {maxPrice && (
+                <Button variant="brand" onClick={() => update({ max_price: Math.max(500_000, Math.ceil((maxPrice * 1.5) / 100_000) * 100_000) })}>
+                  افزایش بودجه
+                </Button>
+              )}
+              {maxPrice && (
+                <Button variant="secondary" onClick={() => update({ max_price: null })}>
+                  حذف فیلتر بودجه
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setParams({}, { replace: true })}>
+                پاک کردن همهٔ فیلترها
+              </Button>
+            </div>
           }
         />
       ) : (

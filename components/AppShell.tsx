@@ -92,7 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <footer className="hidden border-t border-border px-4 py-6 md:block">
         <div className="mx-auto flex max-w-6xl flex-col gap-1 text-xs leading-6 text-muted-foreground">
           <p>
-            قیمت‌ها از دیتاست فروشگاه‌های تهران می‌آید و «موجودی زنده» نیست؛ پیش از رفتن، تلفنی تأیید بگیرید.
+            قیمت‌ها همان مقدار ثبت‌شده در دیتاست است، نه قیمت روز و نه موجودی زنده؛ پیش از رفتن، قیمت و موجودی را از منبع دیگری بررسی کنید.
           </p>
           <p>
             آخرین ثبت قیمت در داده: {jalaliDate(meta?.data.price_newest ?? null)} · نقطهٔ شروع فعلی:{" "}

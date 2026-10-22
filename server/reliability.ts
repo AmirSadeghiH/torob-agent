@@ -3,7 +3,6 @@ import { ageDays } from "./lib/freshness";
 import { fa, toman } from "./lib/text";
 
 export interface ReliabilityShop {
-  phone: string | null;
   has_hours: boolean;
   has_website: boolean;
   has_instagram: boolean;
@@ -27,9 +26,10 @@ export interface ReliabilityInput {
 }
 
 /**
- * Transparent 0–100 confidence score for one offer.
- * Every point is attributable to a signal the UI prints, so the number is
- * never a black box: freshness, shop reachability, warranty, price sanity.
+ * Transparent 0–100 score for how fresh and complete the *record* is.
+ * It says nothing about real stock, a real seller or a verified price: only
+ * dataset signals the UI prints (price age, registered fields, warranty,
+ * price position within the recorded range).
  */
 export function scoreOffer(input: ReliabilityInput): Reliability {
   const signals: ReliabilitySignal[] = [];
@@ -82,29 +82,11 @@ export function scoreOffer(input: ReliabilityInput): Reliability {
     });
   }
 
-  if (input.shop.phone) {
-    add({
-      key: "phone",
-      label: "تماس مستقیم",
-      detail: "شمارهٔ فروشگاه ثبت شده؛ می‌توانید موجودی را تلفنی بپرسید.",
-      tone: "good",
-      points: 8,
-    });
-  } else {
-    add({
-      key: "phone",
-      label: "تماس مستقیم",
-      detail: "شماره‌ای برای این فروشگاه ثبت نشده است.",
-      tone: "warn",
-      points: 0,
-    });
-  }
-
   if (input.shop.has_hours) {
     add({
       key: "hours",
-      label: "ساعت کاری",
-      detail: "ساعت کاری فروشگاه اعلام شده است.",
+      label: "ساعت کاری ثبت‌شده",
+      detail: "ساعت کاری اعلام‌شده در دیتاست موجود است؛ ممکن است تغییر کرده باشد.",
       tone: "good",
       points: 6,
     });
@@ -112,8 +94,8 @@ export function scoreOffer(input: ReliabilityInput): Reliability {
   if (input.shop.has_website || input.shop.has_instagram) {
     add({
       key: "presence",
-      label: "حضور آنلاین",
-      detail: "فروشگاه وب‌سایت یا اینستاگرام دارد.",
+      label: "صفحهٔ ثبت‌شده",
+      detail: "وب‌سایت یا اینستاگرام در دیتاست ثبت شده است؛ به معنی تأیید مستقل فروشگاه نیست.",
       tone: "good",
       points: 4,
     });
@@ -121,8 +103,8 @@ export function scoreOffer(input: ReliabilityInput): Reliability {
   if (input.shop.has_address) {
     add({
       key: "address",
-      label: "نشانی",
-      detail: "نشانی دقیق برای مراجعهٔ حضوری موجود است.",
+      label: "نشانی ثبت‌شده",
+      detail: "نشانی متنی در دیتاست ثبت شده است.",
       tone: "good",
       points: 3,
     });
@@ -131,8 +113,8 @@ export function scoreOffer(input: ReliabilityInput): Reliability {
   if (input.warranty) {
     add({
       key: "warranty",
-      label: "گارانتی",
-      detail: `شرایط گارانتی: ${input.warranty}`,
+      label: "گارانتی ثبت‌شده",
+      detail: `شرایط گارانتی در پیشنهاد ثبت شده است: ${input.warranty}`,
       tone: "good",
       points: 6,
     });
@@ -140,7 +122,7 @@ export function scoreOffer(input: ReliabilityInput): Reliability {
     add({
       key: "warranty",
       label: "گارانتی",
-      detail: "گارانتی برای این پیشنهاد ثبت نشده است.",
+      detail: "شرایط گارانتی برای این پیشنهاد ثبت نشده است؛ یعنی نبودِ گارانتی ثابت نمی‌شود.",
       tone: "neutral",
       points: 0,
     });
@@ -149,8 +131,8 @@ export function scoreOffer(input: ReliabilityInput): Reliability {
   if (input.description) {
     add({
       key: "description",
-      label: "توضیح فروشنده",
-      detail: "فروشنده توضیح تکمیلی برای این پیشنهاد نوشته است.",
+      label: "توضیح ثبت‌شده",
+      detail: "برای این پیشنهاد توضیح تکمیلی ثبت شده است.",
       tone: "good",
       points: 2,
     });
@@ -161,7 +143,7 @@ export function scoreOffer(input: ReliabilityInput): Reliability {
     add({
       key: "price_low",
       label: "اختلاف قیمت",
-      detail: `این پیشنهاد ${toman(second_min - input.price)} از ارزان‌ترین گزینهٔ بعدی کمتر است؛ پیش از پرداخت، اصالت و موجودی را بررسی کنید.`,
+      detail: `این پیشنهاد ${toman(second_min - input.price)} از ارزان‌ترین قیمت ثبت‌شدهٔ بعدی کمتر است؛ چنین اختلافی معمولاً به بررسی بیشتر نیاز دارد.`,
       tone: "warn",
       points: -12,
     });
@@ -169,7 +151,7 @@ export function scoreOffer(input: ReliabilityInput): Reliability {
     add({
       key: "price_high",
       label: "اختلاف قیمت",
-      detail: "قیمت به‌طور محسوس بالاتر از میانهٔ همین کالا در بازار است.",
+      detail: "قیمت به‌طور محسوس بالاتر از میانهٔ قیمت‌های ثبت‌شدهٔ همین کالا است.",
       tone: "warn",
       points: -8,
     });
@@ -177,7 +159,7 @@ export function scoreOffer(input: ReliabilityInput): Reliability {
     add({
       key: "price_band",
       label: "بازهٔ قیمت",
-      detail: "قیمت در محدودهٔ معمول همین کالا در بازار است.",
+      detail: "قیمت در محدودهٔ قیمت‌های ثبت‌شدهٔ همین کالا است.",
       tone: "good",
       points: 4,
     });
@@ -187,7 +169,7 @@ export function scoreOffer(input: ReliabilityInput): Reliability {
     add({
       key: "competition",
       label: "تعداد پیشنهاد",
-      detail: `${fa(offer_count)} فروشگاه این کالا را عرضه می‌کنند؛ قیمت با بازار مقایسه‌پذیر است.`,
+      detail: `${fa(offer_count)} پیشنهاد ثبت‌شده برای این کالا وجود دارد؛ مقایسه بر همین داده‌ها است.`,
       tone: "good",
       points: 4,
     });
@@ -206,19 +188,19 @@ export function scoreOffer(input: ReliabilityInput): Reliability {
     score >= 76 ? "high" : score >= 58 ? "medium" : score >= 38 ? "low" : "unknown";
   const label =
     level === "high"
-      ? "اطلاعات قابل اتکا"
+      ? "اطلاعات تازه و کامل"
       : level === "medium"
-        ? "نسبتاً قابل اتکا"
+        ? "اطلاعات نسبتاً کامل"
         : level === "low"
-          ? "نیازمند تماس"
+          ? "اطلاعات ناقص"
           : "کم‌اطلاعات";
 
   const summary =
     level === "high"
-      ? "قیمت تازه است و فروشگاه راه تماس دارد؛ برای رفتن، فقط موجودی را تأیید کنید."
+      ? "تاریخ قیمت تازه است و بیشتر فیلدهای اطلاعاتی ثبت شده‌اند؛ این وضعیت تأیید موجودی یا صحت قیمت نیست."
       : level === "medium"
-        ? "اطلاعات اصلی موجود است، اما تأیید تلفنی موجودی و قیمت را جا نیندازید."
-        : "پیش از رفتن حتماً تماس بگیرید؛ اطلاعات این پیشنهاد ناقص یا قدیمی است.";
+        ? "بخشی از اطلاعات ثبت شده است؛ قیمت و موجودی را از منبع دیگری بررسی کنید."
+        : "اطلاعات این پیشنهاد ناقص یا قدیمی است؛ بدون بررسی بیشتر به آن تکیه نکنید.";
 
   return { score, level, label, summary, signals };
 }

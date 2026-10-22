@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DAY_MS, ageDays, freshnessOf, isoDaysAgo } from "../lib/freshness";
+import { DAY_MS, FRESHNESS_TEXT, ageDays, freshnessOf, isoDaysAgo } from "../lib/freshness";
+import { shopDisplayName, shopIdentity, shopShortCode } from "../lib/identity";
 import { bbox, distanceLabel, haversineMeters, orderStops } from "../lib/geo";
 import { dayHours, openNow } from "../lib/hours";
 import { parseMessage, extractBudget } from "../nlu";
@@ -157,7 +158,29 @@ test("compare and alternatives need a product context", () => {
   assert.equal(parseMessage("هدفون ارزان‌تر", vocab).intent, "search");
 });
 
-test("reliability rewards fresh, reachable, warranted offers", () => {
+test("only shops with a registered site or handle keep their recorded name", () => {
+  assert.equal(shopIdentity("https://example.com", null), "registered");
+  assert.equal(shopIdentity(null, "https://instagram.com/x"), "registered");
+  assert.equal(shopIdentity("null", "null"), "anonymized");
+  assert.equal(shopIdentity("", null), "anonymized");
+  assert.equal(shopIdentity(null, null), "anonymized");
+
+  assert.equal(shopDisplayName("shop_51d0c1a6edf81ba759726bab", "موبایل تخت جمشید", true), "موبایل تخت جمشید");
+});
+
+test("anonymised shops get an explicit label with a stable short id", () => {
+  const id = "shop_3f93a30a9e66c6dece07cdff";
+  const name = shopDisplayName(id, "فرورا رویس", false);
+  assert.equal(name, "فروشگاه ناشناس‌شده #E07CDFF");
+  assert.equal(shopShortCode(id), "E07CDFF");
+  assert.equal(shopDisplayName(id, "فرورا رویس", false), name);
+  assert.ok(name.includes("ناشناس"));
+
+  const ids = Array.from({ length: 300 }, (_, i) => `shop_${i.toString(16).padStart(24, "0")}`);
+  assert.equal(new Set(ids.map(shopShortCode)).size, ids.length);
+});
+
+test("reliability scores freshness and completeness of the record", () => {
   const base = {
     warranty: "۱۸ ماه گارانتی",
     description: "توضیحات کامل کالا",
@@ -165,7 +188,6 @@ test("reliability rewards fresh, reachable, warranted offers", () => {
     now: NOW,
   };
   const shop = {
-    phone: "02100000000",
     has_hours: true,
     has_website: true,
     has_instagram: true,
@@ -180,11 +202,47 @@ test("reliability rewards fresh, reachable, warranted offers", () => {
     changed_at: isoDaysAgo(200, NOW),
     warranty: null,
     description: null,
-    shop: { ...shop, phone: null, has_hours: false, has_website: false, has_instagram: false },
+    shop: { ...shop, has_hours: false, has_website: false, has_instagram: false },
   });
   assert.ok(fresh.score > old.score, `${fresh.score} should beat ${old.score}`);
   assert.ok(old.score > bare.score);
   assert.ok(fresh.score <= 100 && bare.score >= 0);
   assert.equal(fresh.level, "high");
   assert.ok(fresh.signals.length >= 3);
+});
+
+test("reliability never leans on a phone number or claims stock", () => {
+  const result = scoreOffer({
+    price: 10_000_000,
+    changed_at: isoDaysAgo(3, NOW),
+    warranty: null,
+    description: null,
+    market: { min: 10_000_000, median: 10_000_000, second_min: null, offer_count: 2 },
+    shop: { has_hours: false, has_website: false, has_instagram: false, has_address: true, has_coords: true },
+    now: NOW,
+  });
+  const text = [result.label, result.summary, ...result.signals.map((s) => `${s.label} ${s.detail}`)].join(" ");
+  assert.ok(!result.signals.some((s) => s.key === "phone" || /تماس|تلفن|شماره/.test(s.label)));
+  assert.ok(!/موجود است|موجود هست|موجودی تأیید/.test(text));
+  assert.ok(!/قابل اتکا|مورد اعتماد/.test(result.label));
+  assert.equal(result.level, "medium");
+});
+
+test("unknown price date is never presented as fresh", () => {
+  assert.equal(freshnessOf(null, NOW), "unknown");
+  assert.equal(FRESHNESS_TEXT.unknown, "بدون تاریخ قیمت");
+  assert.equal(ageDays(null, NOW), null);
+  const result = scoreOffer({
+    price: 1_000_000,
+    changed_at: null,
+    warranty: null,
+    description: null,
+    market: { min: null, median: null, second_min: null, offer_count: 1 },
+    shop: { has_hours: false, has_website: false, has_instagram: false, has_address: false, has_coords: false },
+    now: NOW,
+  });
+  const freshness = result.signals.find((s) => s.key === "freshness");
+  assert.equal(freshness?.points, 0);
+  assert.ok(/ثبت نشده/.test(freshness?.detail ?? ""));
+  assert.ok(!/تازه/.test(freshness?.detail ?? ""));
 });

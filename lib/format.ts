@@ -6,10 +6,10 @@ export { fa, faNumber, formatToman };
 
 export const FRESHNESS_LABEL: Record<FreshnessLevel, string> = {
   fresh: "قیمت تازه",
-  recent: "قابل اتکا",
-  stale: "قدیمی",
-  old: "کهنه",
-  unknown: "بدون تاریخ",
+  recent: "قیمت کم‌خطر",
+  stale: "قیمت قدیمی",
+  old: "قیمت کهنه",
+  unknown: "بدون تاریخ قیمت",
 };
 
 export const FRESHNESS_CLASS: Record<FreshnessLevel, string> = {

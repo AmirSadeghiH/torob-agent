@@ -1,3 +1,4 @@
+import "./lib/env";
 import express from "express";
 import { existsSync } from "node:fs";
 import path from "node:path";

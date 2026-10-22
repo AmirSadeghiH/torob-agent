@@ -1,3 +1,4 @@
+import "./lib/env";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";

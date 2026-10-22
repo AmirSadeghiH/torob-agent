@@ -8,7 +8,8 @@ import type {
 } from "../shared/types";
 import { dbHealth, getMeta, getOffer, getProduct, getShop, searchProducts, searchShops } from "./repo";
 import { buildPlan } from "./plan";
-import { respond } from "./agent";
+import { respond } from "./assistant";
+import { normalizeHistory } from "./ai-config";
 
 export const api = express.Router();
 
@@ -190,7 +191,11 @@ api.post("/assistant", wrap(async (req, res) => {
     origin: originFrom(rawContext.origin) ?? undefined,
   };
 
-  const response = await respond({ message, context });
+  const response = await respond({
+    message,
+    context,
+    history: normalizeHistory(body.history),
+  });
   res.setHeader("Cache-Control", "no-store");
   res.json(response);
 }));

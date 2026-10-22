@@ -329,7 +329,7 @@ export function ProductPage() {
             )}
 
             <p className="rounded-lg bg-secondary p-2 text-xs leading-6 text-muted-foreground">
-              قیمت ثبت‌شدهٔ دیتاست است، نه موجودی زنده. برای اطمینان، تلفنی تأیید بگیرید.
+              قیمت ثبت‌شدهٔ دیتاست است، نه قیمت فعلی یا موجودی زنده. تاریخ آخرین تغییر قیمت کنار پیشنهادها آمده است؛ برای اطمینان، قیمت و موجودی را از منبع دیگری بررسی کنید.
             </p>
           </section>
         </aside>
@@ -402,7 +402,7 @@ export function ProductPage() {
 
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <ShieldCheck className="size-3.5" strokeWidth={1.5} aria-hidden />
-        اعتبار هر پیشنهاد از تازگی قیمت، راه تماس فروشگاه، گارانتی و فاصلهٔ قیمت با بازار محاسبه می‌شود.
+        این امتیاز فقط تازگی و کامل‌بودن اطلاعات ثبت‌شده را می‌سنجد: سن قیمت، فیلدهای ثبت‌شده، گارانتی و جایگاه قیمت میان قیمت‌های ثبت‌شده. نه موجودی را تأیید می‌کند و نه صحت فروشنده را.
       </p>
     </div>
   );

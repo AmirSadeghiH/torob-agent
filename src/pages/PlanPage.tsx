@@ -76,7 +76,8 @@ export function PlanPage() {
       ),
       "",
       `جمع: ${formatToman(plan.total)}`,
-      `زمان تقریبی: ${fa(plan.visit_minutes)} دقیقه`,
+      `تخمین زمان (بر پایهٔ فاصلهٔ خط مستقیم): ${fa(plan.visit_minutes)} دقیقه`,
+      "فاصله‌ها خط مستقیم بین مختصات‌اند و مسیر خیابان نیستند.",
     ];
     try {
       await navigator.clipboard.writeText(lines.join("\n"));
@@ -237,8 +238,8 @@ export function PlanPage() {
           )}
 
           <p className="text-xs leading-6 text-muted-foreground">
-            مسیر از {origin.label ?? "فردوسی"} شروع می‌شود و ایست‌ها را به ترتیب نزدیک‌ترین مرتب می‌کند.
-            برای تغییر نقطهٔ شروع، از بالای صفحه محله را عوض کنید.
+            چیدمان از {origin.label ?? "فردوسی"} شروع می‌شود و ایست‌ها را به ترتیب نزدیک‌ترین مرتب می‌کند؛
+            فاصله‌ها خط مستقیم‌اند و زمان‌ها تخمینی. برای تغییر نقطهٔ شروع، از بالای صفحه محله را عوض کنید.
           </p>
         </section>
 

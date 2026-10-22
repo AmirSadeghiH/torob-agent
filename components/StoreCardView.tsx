@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Clock, MapPin, Phone, Store } from "lucide-react";
+import { Clock, MapPin, Store } from "lucide-react";
 import type { StoreCard } from "@/shared/types";
 import { cn } from "@/lib/utils";
 import { distanceText, fa, openStateText } from "@/lib/format";
@@ -63,18 +63,6 @@ export function StoreCardView({ store, compact = false }: StoreCardViewProps) {
           <Store className="size-3.5" strokeWidth={1.5} aria-hidden />
           {new Intl.NumberFormat("fa-IR").format(store.matched_offers ?? store.offer_count)} پیشنهاد ثبت‌شده
         </p>
-        {store.phone && (
-          <a
-            href={`tel:${store.phone}`}
-            onClick={(event) => event.stopPropagation()}
-            aria-label={`تماس با ${store.name}`}
-            dir="ltr"
-            className="relative z-30 inline-flex h-11 items-center gap-1.5 rounded-control border-line border-border bg-secondary px-3 text-xs tabular-nums text-foreground hover:bg-accent"
-          >
-            <Phone className="size-3.5" strokeWidth={1.5} aria-hidden />
-            {fa(store.phone)}
-          </a>
-        )}
       </div>
 
       {store.hours_today && store.hours_today.shifts.length > 0 && (

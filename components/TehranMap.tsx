@@ -204,7 +204,7 @@ export function TehranMap({ points, origin, routeOrder = [], className, title }:
                   className="inline-flex h-11 items-center gap-1.5 rounded-control bg-brand px-3 text-xs font-medium text-brand-foreground"
                 >
                   <Navigation className="size-3.5" strokeWidth={2} aria-hidden />
-                  مسیریابی
+                  مسیر پیاده در نقشهٔ باز
                   <ExternalLink className="size-3" strokeWidth={2} aria-hidden />
                 </a>
               )}
@@ -212,7 +212,7 @@ export function TehranMap({ points, origin, routeOrder = [], className, title }:
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            برای دیدن جزئیات، یک نقطه را انتخاب کنید. نقشه شماتیک است؛ فاصله‌ها و جهت‌ها از مختصات واقعی محاسبه شده‌اند.
+            برای دیدن جزئیات، یک نقطه را انتخاب کنید. نقشه شماتیک است و خطوط، مسیر خیابان نیستند؛ فاصله‌ها خط مستقیم بین مختصات واقعی‌اند.
           </p>
         )}
       </div>

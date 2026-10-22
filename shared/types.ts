@@ -12,14 +12,17 @@ export interface Origin {
   neighborhood?: string;
 }
 
+export type ShopIdentity = "registered" | "anonymized";
+
 export interface StoreRef {
   shop_id: string;
   name: string;
+  /** «registered» فقط یعنی سایت/اینستاگرام در دیتاست ثبت شده؛ تأیید مستقل نیست. */
+  identity: ShopIdentity;
   neighborhood: string | null;
   address: string | null;
   lat: number | null;
   lon: number | null;
-  phone: string | null;
   distance_m: number | null;
 }
 
@@ -165,7 +168,7 @@ export interface Meta {
     price_oldest: string | null;
     priced_offers: number;
   };
-  assistant: { engine: "rules"; note: string };
+  assistant: { engine: "rules" | "llm_agent"; note: string };
 }
 
 export interface SearchParams {
@@ -356,7 +359,14 @@ export type Block =
     }
   | { type: "plan"; title: string; plan: Plan }
   | { type: "insight"; title: string; items: InsightItem[] }
-  | { type: "note"; title?: string; body: string; tone: "info" | "warn" | "success" };
+  | {
+      type: "note";
+      title?: string;
+      body: string;
+      tone: "info" | "warn" | "success";
+      /** Real, parameter-carrying next steps (e.g. raise the budget, drop filters). */
+      actions?: { label: string; to: string }[];
+    };
 
 export type AssistantIntent =
   | "greeting"
@@ -380,9 +390,16 @@ export interface AssistantContext {
   origin?: Origin;
 }
 
+/** A bounded slice of the conversation so follow-ups keep their subject. */
+export interface AssistantHistoryTurn {
+  role: "user" | "assistant";
+  text: string;
+}
+
 export interface AssistantRequest {
   message: string;
   context?: AssistantContext;
+  history?: AssistantHistoryTurn[];
 }
 
 export interface AssistantResponse {
@@ -391,11 +408,14 @@ export interface AssistantResponse {
   suggestions: string[];
   context: AssistantContext;
   meta: {
-    engine: "rules" | "llm";
+    /** `llm_agent` = the model chose and ran the tools; `rules_fallback` = deterministic engine answered. */
+    engine: "rules" | "llm_agent" | "rules_fallback";
     ms: number;
     intent: AssistantIntent;
     tool_calls: string[];
     parsed: Record<string, string | number | boolean | null>;
+    /** Configured model identifier when the LLM agent was the engine. */
+    model?: string | null;
   };
 }
 

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Check, MapPin, Phone, Plus, ShieldCheck, Store } from "lucide-react";
+import { Check, MapPin, Plus, ShieldCheck, Store } from "lucide-react";
 import type { OfferView } from "@/shared/types";
 import { useBasket } from "@/lib/app-state";
 import { cn } from "@/lib/utils";
@@ -95,11 +95,6 @@ export function OfferRow({ offer, productTitle, isBest = false }: OfferRowProps)
             </span>
           )}
           {offer.shop.distance_m !== null && <span>{distanceText(offer.shop.distance_m)}</span>}
-          {offer.shop.phone && (
-            <span dir="ltr" className="tabular-nums">
-              {fa(offer.shop.phone)}
-            </span>
-          )}
         </p>
       </div>
 
@@ -114,20 +109,9 @@ export function OfferRow({ offer, productTitle, isBest = false }: OfferRowProps)
       )}
 
       <div className="flex items-center gap-2">
-        {offer.shop.phone ? (
-          <a
-            href={`tel:${offer.shop.phone}`}
-            aria-label={`تماس با ${offer.shop.name}`}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-control border-line border-border bg-secondary px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            <Phone className="size-4" strokeWidth={1.5} aria-hidden />
-            تماس برای تأیید موجودی
-          </a>
-        ) : (
-          <span className="flex h-11 flex-1 items-center justify-center rounded-control border-line border-border text-xs text-muted-foreground">
-            شمارهٔ تماس ثبت نشده
-          </span>
-        )}
+        <span className="flex flex-1 items-center text-xs leading-6 text-muted-foreground">
+          قیمت ثبت‌شده است؛ موجودی و قیمت روز را از منبع دیگری بررسی کنید.
+        </span>
         <button
           type="button"
           onClick={add}

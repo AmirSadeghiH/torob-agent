@@ -169,7 +169,7 @@ function offersByPrice(offers: OfferView[]): OfferView[] {
   return [...offers].sort((a, b) => a.price - b.price);
 }
 
-function comparisonRows(products: ProductDetail[], origin: Origin): ComparisonRow[] {
+export function comparisonRows(products: ProductDetail[], origin: Origin): ComparisonRow[] {
   const columns = compareColumns(
     products.map((p) => p.product_id),
     origin,
@@ -235,32 +235,62 @@ function comparisonRows(products: ProductDetail[], origin: Origin): ComparisonRo
 
 // ---------------------------------------------------------------- handlers
 
+function exploreHref(parsed: ParsedQuery, patch: Record<string, string | number | null>): string {
+  const merged: Record<string, string | number | null> = {
+    q: parsed.q,
+    category: parsed.category,
+    brand: parsed.brand,
+    neighborhood: parsed.neighborhood,
+    max_price: parsed.max_price,
+    sort: parsed.sort ?? null,
+    ...patch,
+  };
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(merged)) {
+    if (value === null || value === undefined || value === "") continue;
+    search.set(key, String(value));
+  }
+  return `/explore?${search.toString()}`;
+}
+
+/** Round a raised budget up to a readable step so the next search is meaningful. */
+function roundedBudget(value: number): number {
+  return Math.max(500_000, Math.ceil((value * 1.5) / 100_000) * 100_000);
+}
+
+/**
+ * The smallest budget that would actually match something: the cheapest
+ * matching product above the stated budget, rounded up to a readable step.
+ * Data-driven, so the suggested raise is a real parameter that returns
+ * results instead of another empty page.
+ */
+function raisedBudget(params: SearchParams, budget: number, origin: Origin): number {
+  try {
+    const probe = searchProducts(
+      {
+        ...params,
+        max_price: undefined,
+        min_price: budget + 1,
+        sort: "price_asc",
+        page_size: 1,
+      },
+      origin,
+    );
+    const price = probe.items[0]?.min_price;
+    if (typeof price === "number" && price > budget) {
+      return Math.ceil(price / 100_000) * 100_000;
+    }
+  } catch {
+    // Fall back to the generic raise below.
+  }
+  return roundedBudget(budget);
+}
+
 function handleSearch(parsed: ParsedQuery, origin: Origin, context: AssistantContext): Draft {
   const toolCalls: string[] = [];
-  let params = paramsFrom(parsed);
-  let result = searchProducts(params, origin);
+  const params = paramsFrom(parsed);
+  const result = searchProducts(params, origin);
   toolCalls.push("search_products");
-  const relaxedNotes: string[] = [];
-  // Broaden step by step instead of answering «nothing found» while a wider
-  // query in the same intent would have worked.
-  if (result.items.length === 0 && params.max_price) {
-    relaxedNotes.push("بودجه را کمی باز کردم");
-    params = { ...params, max_price: undefined };
-    result = searchProducts(params, origin);
-    toolCalls.push("search_products(relaxed_budget)");
-  }
-  if (result.items.length === 0 && params.q) {
-    relaxedNotes.push("جست‌وجوی متنی را برداشتم و فقط دسته را نگه داشتم");
-    params = { ...params, q: undefined };
-    result = searchProducts(params, origin);
-    toolCalls.push("search_products(relaxed_text)");
-  }
-  if (result.items.length === 0 && params.brand) {
-    relaxedNotes.push("برند را برداشتم");
-    params = { ...params, brand: undefined };
-    result = searchProducts(params, origin);
-    toolCalls.push("search_products(relaxed_brand)");
-  }
 
   const items = result.items;
   const contextOut: AssistantContext = {
@@ -272,16 +302,57 @@ function handleSearch(parsed: ParsedQuery, origin: Origin, context: AssistantCon
   };
 
   if (items.length === 0) {
+    // Never widen the query behind the user's back: the budget they stated is
+    // the budget we report, and widening is an explicit next step they choose.
+    const budget = parsed.max_price;
+    const suggested = budget ? raisedBudget(params, budget, origin) : null;
+    const actions = budget
+      ? [
+          {
+            label: `افزایش بودجه تا ${toman(suggested ?? budget)}`,
+            to: exploreHref(parsed, { max_price: suggested ?? budget }),
+          },
+          { label: "حذف فیلتر بودجه", to: exploreHref(parsed, { max_price: null }) },
+          { label: "حذف همهٔ فیلترها", to: "/explore" },
+        ]
+      : [
+          { label: "دیدن نتیجه در کاوش", to: exploreHref(parsed, {}) },
+          { label: "حذف همهٔ فیلترها", to: "/explore" },
+        ];
     return {
-      reply: parsed.q
-        ? `برای «${parsed.q}» چیزی پیدا نکردم. اگر برند یا مشخصات را ساده‌تر بنویسید، دوباره می‌گردم.`
-        : "در این فیلترها کالایی پیدا نشد. محدودهٔ قیمت یا دسته را کمی باز کنید.",
+      reply: budget
+        ? `در بودجهٔ اعلام‌شده (تا ${toman(budget)}) چیزی پیدا نکردم و جست‌وجو را بی‌اجازهٔ شما بازتر نکردم. بودجه را بالا ببرید یا فیلتر را بردارید.`
+        : parsed.q
+          ? `برای «${parsed.q}» با این فیلترها چیزی پیدا نکردم. اگر برند یا مشخصات را ساده‌تر بنویسید، دوباره می‌گردم.`
+          : "در این فیلترها کالایی پیدا نشد. دسته یا محله را عوض کنید.",
       blocks: [
         {
           type: "note",
-          title: "نتیجه‌ای نبود",
-          body: "می‌توانید بودجه را بالاتر ببرید، دسته را عوض کنید یا نام برند را حذف کنید.",
+          title: "نتیجه‌ای با همین فیلترها نبود",
+          body: budget
+            ? "هیچ پیشنهادی داخل این سقف قیمت نبود. یکی از اقدام‌های زیر جست‌وجوی تازه‌ای با پارامترهای مشخص اجرا می‌کند."
+            : "با پارامترهای فعلی نتیجه‌ای نداشتیم. می‌توانید در کاوش فیلترها را دقیق‌تر تنظیم کنید.",
           tone: "warn",
+          actions,
+        },
+        {
+          type: "filters",
+          title: "فیلترهای اعمال‌شده",
+          active: {
+            q: parsed.q,
+            category: parsed.category,
+            brand: parsed.brand,
+            neighborhood: parsed.neighborhood,
+            max_price: parsed.max_price,
+            max_age_days: null,
+            min_offers: null,
+            sort: parsed.sort,
+          },
+          options: {
+            categories: getMeta().categories.slice(0, 10).map((c) => c.name),
+            neighborhoods: getMeta().neighborhoods.slice(0, 12).map((n) => n.name),
+            brands: getMeta().brands.slice(0, 10),
+          },
         },
       ],
       suggestions: suggestionsFor(parsed),
@@ -345,7 +416,6 @@ function handleSearch(parsed: ParsedQuery, origin: Origin, context: AssistantCon
     }
   }
 
-  const relaxedNote = relaxedNotes.length > 0 ? ` چون نتیجه‌ای نبود، ${relaxedNotes.join(" و ")}.` : "";
   const parts = [
     `${fa(items.length)} گزینه پیدا شد.`,
     cheapest !== undefined ? `ارزان‌ترین از ${toman(cheapest)} شروع می‌شود.` : "",
@@ -353,7 +423,7 @@ function handleSearch(parsed: ParsedQuery, origin: Origin, context: AssistantCon
   ].filter(Boolean);
 
   return {
-    reply: parts.join(" ") + relaxedNote,
+    reply: parts.join(" "),
     blocks,
     suggestions: suggestionsFor(parsed, items[0] ? getProduct(items[0].product_id, origin) : null),
     context: contextOut,
@@ -441,11 +511,11 @@ function storeFromOffer(offer: OfferView): StoreCard {
   return {
     shop_id: offer.shop.shop_id,
     name: offer.shop.name,
+    identity: offer.shop.identity,
     neighborhood: offer.shop.neighborhood,
     address: offer.shop.address,
     lat: offer.shop.lat,
     lon: offer.shop.lon,
-    phone: offer.shop.phone,
     distance_m: offer.shop.distance_m,
     categories: [],
     website: null,
@@ -608,7 +678,7 @@ function handleStores(parsed: ParsedQuery, origin: Origin, context: AssistantCon
   const closest = stores[0]!;
   const subject = parsed.category ?? parsed.brand ?? parsed.q ?? "این دسته";
   return {
-    reply: `${fa(stores.length)} فروشگاه برای ${subject} در اطراف نقطهٔ شما پیدا شد. نزدیک‌ترین «${closest.name}» در ${distanceLabel(closest.distance_m)} است${closest.phone ? `؛ تماس: ${fa(closest.phone)}` : ""}.`,
+    reply: `${fa(stores.length)} فروشگاه برای ${subject} در اطراف نقطهٔ شما پیدا شد. نزدیک‌ترین «${closest.name}» در فاصلهٔ خط مستقیم ${distanceLabel(closest.distance_m)} است. فاصله‌ها تخمینی‌اند و مسیر خیابان نیستند.`,
     blocks: [
       {
         type: "stores",
@@ -683,11 +753,11 @@ function handlePlan(
         plan.stops.map((stop) => ({
           shop_id: stop.shop.shop_id,
           name: stop.shop.name,
+          identity: stop.shop.identity,
           neighborhood: stop.shop.neighborhood,
           address: stop.shop.address,
           lat: stop.shop.lat,
           lon: stop.shop.lon,
-          phone: stop.shop.phone,
           distance_m: stop.shop.distance_m,
           categories: [],
           website: null,
@@ -788,7 +858,7 @@ function handleFreshness(
   const freshnessNote: Block = {
     type: "note",
     title: "چطور تازگی را می‌خوانم",
-    body: "کمتر از ۷ روز تازه، تا ۳۰ روز قابل اتکا و بیشتر از ۹۰ روز کهنه حساب می‌شود. برای خرید حضوری، قیمت‌های کهنه را قبل از رفتن تلفنی تأیید کنید.",
+    body: "کمتر از ۷ روز تازه، تا ۳۰ روز کم‌خطر و بیشتر از ۹۰ روز کهنه حساب می‌شود. این برچسب‌ها فقط سن ثبت قیمت را نشان می‌دهند، نه موجودی یا صحت قیمت. برای خرید حضوری، قیمت‌های کهنه را قبل از رفتن از منبع دیگری بررسی کنید.",
     tone: "info",
   };
   return {

@@ -1,5 +1,6 @@
 import type {
   AssistantContext,
+  AssistantHistoryTurn,
   AssistantResponse,
   HealthResponse,
   Meta,
@@ -88,9 +89,9 @@ export const api = {
       body: JSON.stringify({ offer_ids: offerIds, origin }),
     }),
 
-  assistant: (message: string, context: AssistantContext) =>
+  assistant: (message: string, context: AssistantContext, history?: AssistantHistoryTurn[]) =>
     request<AssistantResponse>("/api/assistant", {
       method: "POST",
-      body: JSON.stringify({ message, context }),
+      body: JSON.stringify({ message, context, history }),
     }),
 };

@@ -20,7 +20,7 @@ export function freshnessOf(iso: string | null, now = Date.now()): FreshnessLeve
 
 export const FRESHNESS_TEXT: Record<FreshnessLevel, string> = {
   fresh: "قیمت تازه",
-  recent: "قیمت قابل اتکا",
+  recent: "قیمت کم‌خطر",
   stale: "قیمت قدیمی",
   old: "قیمت کهنه",
   unknown: "بدون تاریخ قیمت",
