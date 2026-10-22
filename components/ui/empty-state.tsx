@@ -12,9 +12,9 @@ export interface EmptyStateProps {
 /** حالت خالی. Say what's missing and offer the one action that fixes it. */
 export function EmptyState({ icon: Icon = Inbox, title, description, action, className }: EmptyStateProps) {
   return (
-    <div className={cn("flex flex-col items-center gap-2 rounded-xl border border-dashed border-input p-8 text-center", className)}>
-      <span className="flex size-10 items-center justify-center rounded-full bg-secondary">
-        <Icon className="size-5 text-muted-foreground" />
+    <div className={cn("flex flex-col items-center gap-2 rounded-surface border border-dashed border-input bg-card/60 p-8 text-center", className)}>
+      <span className="flex size-11 items-center justify-center rounded-control bg-brand/8">
+        <Icon className="size-5 text-brand" />
       </span>
       <p className="mt-1 text-sm font-medium">{title}</p>
       {description && <p className="max-w-xs text-xs leading-5 text-muted-foreground">{description}</p>}

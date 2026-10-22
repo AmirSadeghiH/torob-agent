@@ -642,7 +642,7 @@ function contextLines(context: AssistantContext, origin: Origin): string {
 
 export function buildSystemPrompt(context: AssistantContext, origin: Origin): string {
   return [
-    "تو دستیار خرید حضوری «هم‌خرید» برای تهران هستی و فقط از دیتاست تراب کار می‌کنی.",
+    "تو «ترب‌یار»، دستیار هوشمند خرید حضوری برای تهران هستی و فقط از دیتاست تراب کار می‌کنی.",
     "",
     "قواعد قطعی:",
     "- دیتاست مرجع همهٔ واقعیت‌های کالا، قیمت، فروشگاه و نشانی است. هیچ کالا، قیمت، مشخصه، نام فروشگاه، نشانی یا فاصله‌ای از خودت نساز.",

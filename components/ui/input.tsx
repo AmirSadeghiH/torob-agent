@@ -28,7 +28,7 @@ export function Input({ className, type, startAddon, endAddon, error, id, dir, .
         grouped
           ? "h-full bg-transparent px-0 outline-none"
           : cn(
-              "h-10 rounded-field border-line-field border-input bg-field shadow-field px-3 transition-colors",
+              "h-11 rounded-field border-line-field border-input bg-field shadow-field px-3 transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:border-transparent",
               "aria-invalid:border-destructive/60",
             ),
@@ -45,7 +45,7 @@ export function Input({ className, type, startAddon, endAddon, error, id, dir, .
     <div
       dir={dir}
       className={cn(
-        "flex h-10 w-full items-center gap-2 rounded-field border-line-field border-input bg-field shadow-field px-3 text-sm transition-colors",
+        "flex h-11 w-full items-center gap-2 rounded-field border-line-field border-input bg-field shadow-field px-3 text-sm transition-colors",
         "focus-within:border-transparent focus-within:ring-2 focus-within:ring-ring/60",
         error && "border-destructive/60",
       )}

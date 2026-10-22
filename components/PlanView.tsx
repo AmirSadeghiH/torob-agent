@@ -57,8 +57,8 @@ export function PlanView({
   const hasRoute = Boolean(route && route.geometry.length > 1);
 
   return (
-    <div className="flex flex-col gap-4 rounded-surface border-line border-border bg-card p-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="flex flex-col gap-4 rounded-surface border-line border-border bg-card p-4 shadow-surface">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat icon={Route} label="ایست" value={fa(route?.stops.length ?? plan.stops.length)} />
         <Stat
           icon={MapPin}
@@ -74,7 +74,7 @@ export function PlanView({
       </div>
 
       {route && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-secondary px-3 py-2 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-control bg-secondary px-3 py-2 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5 text-foreground">
             <ModeIcon className="size-3.5" strokeWidth={1.5} aria-hidden />
             {TRAVEL_MODE_LABEL[route.mode]}
@@ -101,12 +101,12 @@ export function PlanView({
             <li
               key={stop.shop.shop_id}
               className={cn(
-                "grid grid-cols-[auto_1fr] gap-3 rounded-lg transition-colors",
-                active && "bg-accent/60",
+                "grid grid-cols-[auto_1fr] gap-3 rounded-control p-1 transition-colors",
+                active && "bg-accent",
               )}
             >
               <div className="flex flex-col items-center">
-                <span className="flex size-8 items-center justify-center rounded-full bg-brand text-sm font-bold text-brand-foreground">
+                <span className="flex size-8 items-center justify-center rounded-full bg-brand text-sm font-bold text-brand-foreground shadow-control">
                   {fa(stop.order)}
                 </span>
                 {index < plan.stops.length - 1 && <span className="mt-1 w-px flex-1 bg-border" aria-hidden />}
@@ -202,7 +202,7 @@ function Stat({
   value: string;
 }) {
   return (
-    <div className="rounded-lg bg-secondary p-2">
+    <div className="rounded-control border-line border-border bg-background/60 p-2">
       <p className="flex items-center gap-1 text-xs text-muted-foreground">
         <Icon className="size-3.5" strokeWidth={1.5} aria-hidden />
         {label}

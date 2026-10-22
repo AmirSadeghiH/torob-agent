@@ -44,7 +44,7 @@ export function ProductCardView({ product, layout = "grid", eager, onAdded }: Pr
   return (
     <article
       className={cn(
-        "group relative flex overflow-hidden rounded-surface border-line border-border bg-card",
+        "group relative flex overflow-hidden rounded-surface border-line border-border bg-card shadow-surface transition-[box-shadow,border-color] duration-(--motion) ease-motion hover:border-brand/30 hover:shadow-float",
         isList ? "gap-3 p-3" : "flex-col",
       )}
     >
@@ -58,17 +58,17 @@ export function ProductCardView({ product, layout = "grid", eager, onAdded }: Pr
           src={product.image}
           alt={product.title}
           eager={eager}
-          className={cn(isList ? "aspect-square rounded-lg" : "aspect-4/3")}
+          className={cn(isList ? "aspect-square rounded-control" : "aspect-4/3")}
         />
         {product.offer_count > 1 && (
-          <span className="absolute start-2 top-2 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium text-foreground backdrop-blur">
+          <span className="absolute start-2 top-2 rounded-full border-line border-border bg-card/95 px-2 py-0.5 text-xs font-medium text-foreground shadow-control backdrop-blur">
             {new Intl.NumberFormat("fa-IR").format(product.offer_count)} فروشگاه
           </span>
         )}
       </div>
 
       <div className={cn("relative z-10 flex min-w-0 flex-1 flex-col gap-2", isList ? "" : "p-3")}>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {product.brand && <span className="truncate">{product.brand}</span>}
           {product.brand && <span aria-hidden>·</span>}
           <span className="truncate">{product.category}</span>
@@ -78,14 +78,14 @@ export function ProductCardView({ product, layout = "grid", eager, onAdded }: Pr
           {product.title}
         </h3>
 
-        <div className="mt-auto flex flex-wrap items-end justify-between gap-2">
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-2 pt-1">
           <div className="min-w-0">
             {product.min_price !== null ? (
               <p className="flex items-baseline gap-1">
                 {product.offer_count > 1 && (
                   <span className="text-xs text-muted-foreground">از</span>
                 )}
-                <span className="text-lg font-bold tabular-nums">{formatToman(product.min_price)}</span>
+                <span className="text-lg font-bold tabular-nums text-foreground">{formatToman(product.min_price)}</span>
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">قیمت ثبت نشده</p>
@@ -117,7 +117,7 @@ export function ProductCardView({ product, layout = "grid", eager, onAdded }: Pr
               "relative z-30 flex size-11 shrink-0 items-center justify-center rounded-full border-line transition-colors",
               inPlan
                 ? "border-brand bg-brand text-brand-foreground"
-                : "border-border bg-secondary text-foreground hover:bg-accent",
+                : "border-border bg-card text-foreground hover:border-brand/40 hover:bg-accent hover:text-brand",
               "disabled:opacity-40",
             )}
           >

@@ -6,6 +6,7 @@ import {
   Check,
   Copy,
   Headphones,
+  MapPin,
   RotateCcw,
   Route,
   Smartphone,
@@ -45,10 +46,24 @@ const PROMPTS = [
   },
 ];
 
+function AgentMark({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "flex size-9 shrink-0 items-center justify-center rounded-control bg-brand/10 text-brand ring-1 ring-brand/15",
+        className,
+      )}
+      aria-hidden
+    >
+      <Sparkles className="size-4" strokeWidth={2} />
+    </span>
+  );
+}
+
 function UserMessage({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[85%] rounded-2xl rounded-ee-md bg-secondary px-4 py-2.5 text-sm leading-7 text-secondary-foreground">
+      <div className="max-w-[85%] rounded-2xl rounded-ee-md bg-brand px-4 py-2.5 text-sm leading-7 text-brand-foreground shadow-control">
         {text}
       </div>
     </div>
@@ -78,27 +93,30 @@ function AssistantMessage({
 
   return (
     <div className="flex gap-3">
-      <span
-        className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/15 text-brand"
-        aria-hidden
-      >
-        <Sparkles className="size-4" strokeWidth={1.5} />
-      </span>
+      <AgentMark className="mt-1" />
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p className="whitespace-pre-line text-sm leading-8 text-foreground">{text}</p>
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-xs font-semibold text-foreground">
+              ترب‌یار
+              <span className="font-normal text-muted-foreground">دستیار خرید</span>
+            </p>
+            <p className="mt-1 whitespace-pre-line text-sm leading-8 text-foreground sm:text-base sm:leading-9">
+              {text}
+            </p>
+          </div>
           <button
             type="button"
             onClick={copy}
             aria-label="کپی پاسخ"
-            className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="flex size-11 shrink-0 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             {copied ? <Check className="size-4" strokeWidth={2} aria-hidden /> : <Copy className="size-4" strokeWidth={1.5} aria-hidden />}
           </button>
         </div>
 
         {blocks && blocks.length > 0 && (
-          <div className="mt-3 flex flex-col gap-6">
+          <div className="mt-3 flex flex-col gap-5">
             {blocks.map((block, index) => (
               <BlockView key={`${block.type}-${index}`} block={block} />
             ))}
@@ -106,7 +124,7 @@ function AssistantMessage({
         )}
 
         {meta && import.meta.env.DEV && (
-          <details className="mt-3 rounded-lg border-line border-border bg-background/60 p-2 text-xs text-muted-foreground">
+          <details className="mt-3 rounded-control border-line border-border bg-card p-2 text-xs text-muted-foreground">
             <summary className="cursor-pointer">پنل توسعه</summary>
             <pre dir="ltr" className="mt-2 overflow-auto text-xs">
               {JSON.stringify({ engine: meta.engine, intent: meta.intent, ms: meta.ms }, null, 2)}
@@ -121,16 +139,23 @@ function AssistantMessage({
 function Typing() {
   return (
     <div className="flex gap-3" aria-live="polite">
-      <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/15 text-brand">
-        <Sparkles className="size-4" strokeWidth={1.5} aria-hidden />
-      </span>
-      <div className="flex w-full flex-col gap-2">
-        <p className="text-xs text-muted-foreground">در حال جست‌وجو در قیمت‌ها…</p>
-        <Skeleton className="h-3 w-2/3" />
-        <Skeleton className="h-3 w-1/2" />
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <Skeleton className="aspect-4/3 w-full" />
-          <Skeleton className="aspect-4/3 w-full" />
+      <AgentMark className="mt-1" />
+      <div className="w-full max-w-md rounded-surface border-line border-border bg-card p-4 shadow-surface">
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1" aria-hidden>
+            <span className="size-1.5 animate-pulse rounded-full bg-brand" />
+            <span className="size-1.5 animate-pulse rounded-full bg-brand [animation-delay:150ms]" />
+            <span className="size-1.5 animate-pulse rounded-full bg-brand [animation-delay:300ms]" />
+          </span>
+          در حال بررسی قیمت‌ها و فروشگاه‌ها…
+        </p>
+        <div className="mt-3 flex flex-col gap-2">
+          <Skeleton className="h-3 w-2/3" />
+          <Skeleton className="h-3 w-1/2" />
+          <div className="mt-1 grid grid-cols-2 gap-2">
+            <Skeleton className="aspect-4/3 w-full" />
+            <Skeleton className="aspect-4/3 w-full" />
+          </div>
         </div>
       </div>
     </div>
@@ -169,74 +194,75 @@ export function ChatPage() {
 
   const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
   const suggestions = lastAssistant?.suggestions ?? [];
+  const empty = messages.length === 0;
 
   return (
-    <div className="flex flex-col gap-6">
-      {messages.length === 0 ? (
-        <section className="rise flex flex-col gap-6 py-2">
-          <div className="flex flex-col gap-3">
-            <p className="inline-flex w-fit items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-xs font-medium text-brand">
-              <Sparkles className="size-3.5" strokeWidth={2} aria-hidden />
-              دستیار خرید حضوری تهران
-            </p>
-            <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
-              چه چیزی می‌خواهید بخرید؟
-            </h1>
-            <p className="max-w-xl text-sm leading-8 text-muted-foreground">
-              قیمت‌های ثبت‌شدهٔ فروشگاه‌های تهران را مقایسه می‌کنم، تازگی هر اطلاعات را نشان می‌دهم و
-              یک برنامهٔ حضوری می‌چینم که فقط ایست‌های نزدیک هم را داشته باشد.
-            </p>
-            <dl className="flex flex-wrap gap-x-6 gap-y-2 pt-1 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1.5">
-                <dt>کالا</dt>
-                <dd className="font-medium text-foreground">{faNumber(meta.counts.products)}</dd>
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+      {empty ? (
+        <section className="rise flex flex-col gap-5">
+          <div className="agent-wash relative overflow-hidden rounded-surface border-line border-border bg-card shadow-surface">
+            <div className="agent-grid pointer-events-none absolute inset-0" aria-hidden />
+            <div className="relative flex flex-col gap-4 px-5 py-7 sm:px-8 sm:py-9">
+              <p className="inline-flex w-fit items-center gap-2 rounded-full border-line border-brand/20 bg-brand/5 px-3 py-1 text-xs font-medium text-brand">
+                <Sparkles className="size-3.5" strokeWidth={2} aria-hidden />
+                دستیار خرید هوشمند
+              </p>
+              <div className="flex flex-col gap-3">
+                <h1 className="max-w-xl text-2xl font-bold leading-tight sm:text-4xl">
+                  بگویید چه می‌خواهید بخرید
+                </h1>
+                <p className="max-w-2xl text-sm leading-8 text-muted-foreground sm:text-base sm:leading-9">
+                  به‌جای گشتن در فروشگاه‌ها، فقط بپرسید. قیمت‌های ثبت‌شدهٔ فروشگاه‌های تهران را مقایسه
+                  می‌کنم، تازگی هر قیمت را نشان می‌دهم و اگر بخواهید، مسیر یک خرید حضوری را می‌چینم.
+                </p>
               </div>
-              <div className="flex items-center gap-1.5">
-                <dt>پیشنهاد قیمت</dt>
-                <dd className="font-medium text-foreground">{faNumber(meta.counts.offers)}</dd>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <dt>فروشگاه</dt>
-                <dd className="font-medium text-foreground">{faNumber(meta.counts.shops)}</dd>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <dt>شروع از</dt>
-                <dd className="font-medium text-foreground">{origin.label ?? "فردوسی"}</dd>
-              </div>
-            </dl>
-          </div>
-
-          <div className="stagger grid gap-2 sm:grid-cols-2">
-            {PROMPTS.map((prompt) => (
-              <button
-                key={prompt.title}
-                type="button"
-                onClick={() => submit(prompt.message)}
-                className="flex min-h-16 items-start gap-3 rounded-surface border-line border-border bg-card p-3 text-start transition-colors hover:border-brand/50 hover:bg-accent"
-              >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-brand">
-                  <prompt.icon className="size-4" strokeWidth={1.5} aria-hidden />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium leading-6">{prompt.title}</span>
-                  <span className="block text-xs text-muted-foreground">{prompt.hint}</span>
-                </span>
-              </button>
-            ))}
+              <dl className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <dt>کالا</dt>
+                  <dd className="font-medium text-foreground">{faNumber(meta.counts.products)}</dd>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <dt>پیشنهاد قیمت</dt>
+                  <dd className="font-medium text-foreground">{faNumber(meta.counts.offers)}</dd>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <dt>فروشگاه</dt>
+                  <dd className="font-medium text-foreground">{faNumber(meta.counts.shops)}</dd>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="size-3.5 text-brand" strokeWidth={1.5} aria-hidden />
+                  <dt>شروع از</dt>
+                  <dd className="font-medium text-foreground">{origin.label ?? "فردوسی"}</dd>
+                </div>
+              </dl>
+            </div>
           </div>
 
           <div className="flex flex-col gap-2">
-            <p className="text-xs text-muted-foreground">یا از یک دسته شروع کنید</p>
-            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-              {meta.categories.slice(0, 8).map((category) => (
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-xs font-medium text-foreground">یک شروع سریع</p>
+              <p className="text-xs text-muted-foreground">یا سؤال خودتان را بنویسید</p>
+            </div>
+            <div className="stagger grid gap-2 sm:grid-cols-2">
+              {PROMPTS.map((prompt) => (
                 <button
-                  key={category.name}
+                  key={prompt.title}
                   type="button"
-                  onClick={() => submit(`ارزان‌ترین‌های ${category.name}`)}
-                  className="flex h-11 shrink-0 items-center gap-1.5 rounded-full border-line border-border bg-card px-3 text-xs transition-colors hover:border-brand/50 hover:bg-accent"
+                  onClick={() => submit(prompt.message)}
+                  className="card-lift group flex min-h-16 items-center gap-3 rounded-surface border-line border-border bg-card p-3 text-start shadow-surface hover:bg-accent"
                 >
-                  {category.name}
-                  <span className="text-muted-foreground">{faNumber(category.product_count)}</span>
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-brand/8 text-brand">
+                    <prompt.icon className="size-4" strokeWidth={1.5} aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium leading-6">{prompt.title}</span>
+                    <span className="block text-xs text-muted-foreground">{prompt.hint}</span>
+                  </span>
+                  <ArrowLeft
+                    className="size-4 shrink-0 text-muted-foreground/60 transition-transform duration-(--motion) ease-motion group-hover:-translate-x-0.5 group-hover:text-brand"
+                    strokeWidth={1.5}
+                    aria-hidden
+                  />
                 </button>
               ))}
             </div>
@@ -244,21 +270,22 @@ export function ChatPage() {
         </section>
       ) : (
         <>
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <MapPin className="size-3.5 text-brand" strokeWidth={1.5} aria-hidden />
               نقطهٔ شروع فاصله‌ها: {origin.label ?? "فردوسی"}
             </p>
             <button
               type="button"
               onClick={reset}
-              className="inline-flex h-11 items-center gap-1.5 rounded-control px-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="inline-flex h-11 items-center gap-1.5 rounded-control px-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <RotateCcw className="size-3.5" strokeWidth={1.5} aria-hidden />
               گفت‌وگوی تازه
             </button>
           </div>
 
-          <div className="flex flex-col gap-6" aria-live="polite">
+          <div className="flex flex-col gap-7" aria-live="polite">
             {messages.map((message) =>
               message.role === "user" ? (
                 <UserMessage key={message.id} text={message.text} />
@@ -277,12 +304,15 @@ export function ChatPage() {
       )}
 
       {error && (
-        <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border-line border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-surface border-line border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive"
+        >
           <span>{error}</span>
           <button
             type="button"
             onClick={() => void retry()}
-            className="inline-flex h-11 items-center rounded-control border-line border-destructive/40 px-3 text-xs font-medium"
+            className="inline-flex h-11 items-center rounded-control border-line border-destructive/30 px-3 text-xs font-medium"
           >
             تلاش دوباره
           </button>
@@ -291,15 +321,16 @@ export function ChatPage() {
 
       {suggestions.length > 0 && !sending && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-muted-foreground">قدم بعدی</p>
+          <p className="text-xs font-medium text-foreground">قدم بعدی</p>
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
             {suggestions.map((suggestion) => (
               <button
                 key={suggestion}
                 type="button"
                 onClick={() => submit(suggestion)}
-                className="flex h-11 shrink-0 items-center rounded-full border-line border-border bg-card px-3 text-xs transition-colors hover:border-brand/50 hover:bg-accent"
+                className="flex h-11 shrink-0 items-center gap-1.5 rounded-full border-line border-border bg-card px-3 text-xs shadow-control transition-colors hover:border-brand/40 hover:bg-accent"
               >
+                <Sparkles className="size-3.5 text-brand" strokeWidth={1.5} aria-hidden />
                 {suggestion}
               </button>
             ))}
@@ -307,16 +338,19 @@ export function ChatPage() {
         </div>
       )}
 
-      <div className="sticky bottom-16 z-30 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:bottom-0 md:mx-0 md:rounded-t-surface">
+      <div className="sticky above-nav z-30 -mx-4 mt-auto bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-2 pt-6 md:mx-0 md:px-0">
         <form
-          className="flex items-end gap-2"
+          className="flex items-end gap-2 rounded-surface border-line border-border bg-card p-2 shadow-float transition-shadow focus-within:border-brand/40 focus-within:ring-2 focus-within:ring-brand/10"
           onSubmit={(event) => {
             event.preventDefault();
             submit(draft);
           }}
         >
+          <span className="mb-0.5 hidden size-10 shrink-0 items-center justify-center rounded-control bg-brand/8 text-brand sm:flex" aria-hidden>
+            <Sparkles className="size-4" strokeWidth={2} />
+          </span>
           <label htmlFor="chat-input" className="sr-only">
-            پیام به دستیار
+            پیام به ترب‌یار
           </label>
           <textarea
             id="chat-input"
@@ -329,22 +363,22 @@ export function ChatPage() {
               }
             }}
             rows={1}
-            placeholder="مثلاً: هدفون بی‌سیم زیر ۵ میلیون"
+            placeholder="مثلاً: هدفون بی‌سیم زیر ۵ میلیون در فردوسی"
             className={cn(
-              "max-h-32 min-h-11 flex-1 resize-none rounded-field border-line-field border-input bg-field px-3 py-2.5 text-sm leading-6",
-              "placeholder:text-muted-foreground/70 focus-visible:border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+              "max-h-32 min-h-11 flex-1 resize-none rounded-control bg-transparent px-2 py-2.5 text-sm leading-6",
+              "placeholder:text-muted-foreground/70 focus-visible:outline-none",
             )}
           />
           <button
             type="submit"
             disabled={sending || draft.trim().length === 0}
             aria-label="ارسال پیام"
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground transition-opacity disabled:opacity-40"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-control transition-[background-color,opacity,transform] duration-(--motion) ease-motion hover:bg-brand/90 disabled:bg-secondary disabled:text-muted-foreground disabled:shadow-none active:[transform:var(--press)]"
           >
             <ArrowLeft className="size-5" strokeWidth={2} aria-hidden />
           </button>
         </form>
-        <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
           <Wallet className="size-3.5" strokeWidth={1.5} aria-hidden />
           {basket.items.length > 0
             ? `${fa(basket.items.length)} قلم در برنامهٔ خرید شماست؛ بگویید «برنامهٔ خرید بچین».`

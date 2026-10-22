@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "هم‌خرید — دستیار خرید حضوری تهران",
+  "description": "ترب‌یار — دستیار هوشمند خرید تهران",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:web": "vite",
