@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
+import { Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { BasketProvider, ChatProvider, MetaProvider, OriginProvider, useMeta } from "@/lib/app-state";
 import { Button } from "@/components/ui/button";
@@ -22,9 +23,15 @@ function ScrollToTop() {
 
 function BootScreen({ error, retry }: { error?: string | null; retry?: () => void }) {
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background px-6 text-center">
-      <div className="flex size-12 items-center justify-center rounded-xl bg-brand text-lg font-bold text-brand-foreground">
-        هـ
+    <div className="agent-wash flex min-h-dvh flex-col items-center justify-center gap-4 bg-background px-6 text-center">
+      <div className="flex items-center gap-3">
+        <span className="flex size-12 items-center justify-center rounded-surface bg-brand text-brand-foreground shadow-float">
+          <Sparkles className="size-6" strokeWidth={2} aria-hidden />
+        </span>
+        <span className="text-start">
+          <span className="block text-lg font-bold leading-6">ترب‌یار</span>
+          <span className="block text-xs text-muted-foreground">دستیار هوشمند خرید</span>
+        </span>
       </div>
       {error ? (
         <>

@@ -57,16 +57,16 @@ export function OfferRow({ offer, productTitle, isBest = false }: OfferRowProps)
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 rounded-xl border-line p-3 transition-colors",
-        isBest ? "border-brand/60 bg-brand/5" : "border-border bg-background/40",
+        "flex flex-col gap-3 rounded-surface border-line p-4 transition-colors",
+        isBest ? "border-brand/30 bg-brand/5" : "border-border bg-card",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-lg font-bold tabular-nums">{formatToman(offer.price)}</span>
+            <span className="text-xl font-bold tabular-nums text-foreground">{formatToman(offer.price)}</span>
             {isBest && (
-              <span className="rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-brand-foreground">
+              <span className="rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-brand-foreground shadow-control">
                 کمترین قیمت
               </span>
             )}
@@ -117,10 +117,10 @@ export function OfferRow({ offer, productTitle, isBest = false }: OfferRowProps)
           onClick={add}
           aria-label={inPlan ? "در برنامهٔ خرید" : "افزودن به برنامهٔ خرید"}
           className={cn(
-            "flex size-11 items-center justify-center rounded-control border-line transition-colors",
+            "flex size-11 items-center justify-center rounded-full border-line transition-colors",
             inPlan
               ? "border-brand bg-brand text-brand-foreground"
-              : "border-border bg-secondary text-foreground hover:bg-accent",
+              : "border-border bg-card text-foreground hover:border-brand/40 hover:bg-accent hover:text-brand",
           )}
         >
           {inPlan ? <Check className="size-4" strokeWidth={2} aria-hidden /> : <Plus className="size-4" strokeWidth={2} aria-hidden />}

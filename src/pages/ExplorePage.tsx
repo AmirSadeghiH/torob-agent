@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { ArrowDown, SlidersHorizontal, X } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { ArrowDown, Compass, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import type { ProductCard, SearchParams } from "@/shared/types";
 import { api, ApiError } from "@/lib/api";
 import { useAppMeta, useOrigin } from "@/lib/app-state";
@@ -51,7 +51,7 @@ function ChipRow({
             "flex h-11 items-center rounded-control border-line px-3 text-xs transition-colors",
             value === item.value
               ? "border-brand bg-brand text-brand-foreground"
-              : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground",
+              : "border-border bg-card text-muted-foreground hover:border-brand/30 hover:bg-accent hover:text-foreground",
           )}
         >
           {item.label}
@@ -193,15 +193,28 @@ export function ExplorePage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-bold sm:text-2xl">کاوش قیمت‌ها</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {loading ? "در حال جست‌وجو…" : `${faNumber(total)} کالا در داده پیدا شد`}
-            </p>
+      <header className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div className="flex flex-col gap-2">
+              <p className="inline-flex w-fit items-center gap-1.5 rounded-full bg-brand/5 px-2.5 py-1 text-xs font-medium text-brand">
+                <Compass className="size-3.5" strokeWidth={2} aria-hidden />
+                ابزار کاوش قیمت
+              </p>
+              <h1 className="text-2xl font-bold">کاوش قیمت‌ها</h1>
+              <p className="text-sm text-muted-foreground">
+                {loading ? "در حال جست‌وجو…" : `${faNumber(total)} کالا در داده پیدا شد`} · فاصله‌ها از{" "}
+                {origin.label ?? "فردوسی"}
+              </p>
+            </div>
+            <Link
+              to="/"
+              className="inline-flex h-11 items-center gap-2 rounded-full border-line border-border bg-card px-4 text-sm font-medium text-foreground shadow-control transition-colors hover:border-brand/30 hover:text-brand"
+            >
+              <Sparkles className="size-4 text-brand" strokeWidth={1.5} aria-hidden />
+              از دستیار بپرسید
+            </Link>
           </div>
-          <p className="text-xs text-muted-foreground">فاصله‌ها از {origin.label ?? "فردوسی"}</p>
         </div>
 
         <SearchInput
@@ -272,7 +285,7 @@ export function ExplorePage() {
       </div>
 
       {showFilters && (
-        <section className="rise flex flex-col gap-4 rounded-surface border-line border-border bg-card p-4">
+        <section className="rise flex flex-col gap-4 rounded-surface border-line border-border bg-card p-4 shadow-surface">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <label htmlFor="min-price" className="text-xs text-muted-foreground">
@@ -329,7 +342,7 @@ export function ExplorePage() {
                 "flex h-11 items-center rounded-control border-line px-3 text-xs transition-colors",
                 minOffers === 2
                   ? "border-brand bg-brand text-brand-foreground"
-                  : "border-border bg-background hover:bg-accent",
+                  : "border-border bg-card hover:border-brand/30 hover:bg-accent",
               )}
             >
               فقط کالاهای چندفروشنده
@@ -344,7 +357,7 @@ export function ExplorePage() {
                 onClick={() => update({ neighborhood: null })}
                 className={cn(
                   "flex h-11 shrink-0 items-center rounded-full border-line px-3 text-xs",
-                  neighborhood === "" ? "border-brand bg-brand text-brand-foreground" : "border-border bg-background",
+                  neighborhood === "" ? "border-brand bg-brand text-brand-foreground" : "border-border bg-card",
                 )}
               >
                 همهٔ تهران
@@ -358,7 +371,7 @@ export function ExplorePage() {
                     "flex h-11 shrink-0 items-center rounded-full border-line px-3 text-xs",
                     hood.name === neighborhood
                       ? "border-brand bg-brand text-brand-foreground"
-                      : "border-border bg-background",
+                      : "border-border bg-card",
                   )}
                 >
                   {hood.name}
@@ -393,7 +406,7 @@ export function ExplorePage() {
               key={chip.key}
               type="button"
               onClick={chip.clear}
-              className="flex h-11 items-center gap-1 rounded-full bg-secondary px-3 text-xs hover:bg-accent"
+              className="flex h-11 items-center gap-1 rounded-full border-line border-border bg-card px-3 text-xs shadow-control hover:bg-accent"
               aria-label={`حذف فیلتر ${chip.label}`}
             >
               {chip.label}
@@ -404,7 +417,7 @@ export function ExplorePage() {
       )}
 
       {error && (
-        <div role="alert" className="rounded-xl border-line border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <div role="alert" className="rounded-surface border-line border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">
           {error}
         </div>
       )}

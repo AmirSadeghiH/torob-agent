@@ -11,7 +11,7 @@ interface StoreCardViewProps {
 
 export function StoreCardView({ store, compact = false }: StoreCardViewProps) {
   return (
-    <article className="relative flex flex-col gap-2 rounded-surface border-line border-border bg-card p-4">
+    <article className="relative flex flex-col gap-2 rounded-surface border-line border-border bg-card p-4 shadow-surface transition-[box-shadow,border-color] duration-(--motion) ease-motion hover:border-brand/30 hover:shadow-float">
       <Link
         to={`/s/${store.shop_id}`}
         className="absolute inset-0 z-20 rounded-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -32,11 +32,11 @@ export function StoreCardView({ store, compact = false }: StoreCardViewProps) {
         </div>
         <span
           className={cn(
-            "shrink-0 rounded-full px-2 py-0.5 text-xs",
+            "shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium",
             store.open_now === true
-              ? "bg-success/15 text-success"
+              ? "bg-success/10 text-success"
               : store.open_now === false
-                ? "bg-destructive/15 text-destructive"
+                ? "bg-destructive/10 text-destructive"
                 : "bg-secondary text-muted-foreground",
           )}
         >

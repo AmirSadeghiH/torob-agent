@@ -154,7 +154,7 @@ export function PlanPage() {
   async function copyPlan() {
     if (!plan) return;
     const lines = [
-      "هم‌خرید — برنامهٔ خرید حضوری",
+      "ترب‌یار — برنامهٔ خرید حضوری",
       `شروع: ${origin.label ?? "فردوسی"}`,
       "",
       ...plan.stops.map(
@@ -201,9 +201,13 @@ export function PlanPage() {
   if (basket.items.length === 0) {
     return (
       <div className="flex flex-col gap-4">
-        <header>
-          <h1 className="text-xl font-bold sm:text-2xl">برنامهٔ خرید</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+        <header className="flex flex-col gap-2">
+          <p className="inline-flex w-fit items-center gap-1.5 rounded-full bg-brand/5 px-2.5 py-1 text-xs font-medium text-brand">
+            <Route className="size-3.5" strokeWidth={2} aria-hidden />
+            مسیر خرید حضوری
+          </p>
+          <h1 className="text-2xl font-bold">برنامهٔ خرید</h1>
+          <p className="text-sm text-muted-foreground">
             اقلامی که می‌خواهید حضوری ببینید را اینجا جمع کنید تا مسیرشان را بچینم.
           </p>
         </header>
@@ -234,10 +238,14 @@ export function PlanPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <header className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold sm:text-2xl">برنامهٔ خرید</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-2">
+          <p className="inline-flex w-fit items-center gap-1.5 rounded-full bg-brand/5 px-2.5 py-1 text-xs font-medium text-brand">
+            <Route className="size-3.5" strokeWidth={2} aria-hidden />
+            مسیر خرید حضوری
+          </p>
+          <h1 className="text-2xl font-bold">برنامهٔ خرید</h1>
+          <p className="text-sm text-muted-foreground">
             {fa(basket.items.length)} قلم در {fa(groups.length)} فروشگاه · شروع از{" "}
             {origin.label ?? "فردوسی"}
           </p>
@@ -253,7 +261,7 @@ export function PlanPage() {
                   setRoute(null);
                   setConfirmClear(false);
                 }}
-                className="flex h-11 items-center rounded-control bg-destructive px-3 text-xs font-medium text-white"
+                className="flex h-11 items-center rounded-control bg-destructive px-3 text-xs font-medium text-brand-foreground"
               >
                 بله، پاک کن
               </button>
@@ -279,7 +287,7 @@ export function PlanPage() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <section className="flex flex-col gap-3 rounded-surface border-line border-border bg-card p-4">
+        <section className="flex flex-col gap-3 rounded-surface border-line border-border bg-card p-4 shadow-surface">
           <h2 className="text-sm font-semibold">اقلام سبد</h2>
           <div className="flex flex-col gap-4">
             {groups.map((group) => (
@@ -347,11 +355,11 @@ export function PlanPage() {
             )}
           </div>
 
-          <div className="flex flex-col gap-2 rounded-surface border-line border-border bg-card p-3">
+          <div className="flex flex-col gap-2 rounded-surface border-line border-border bg-card p-3 shadow-surface">
             <div
               role="group"
               aria-label="حالت سفر"
-              className="grid grid-cols-3 gap-1 rounded-control border-line border-border p-1"
+              className="grid grid-cols-3 gap-1 rounded-control border-line border-border bg-background/60 p-1"
             >
               {MODES.map(({ value, label, Icon }) => {
                 const active = mode === value;
@@ -405,7 +413,7 @@ export function PlanPage() {
             </div>
 
             {mode === "walk" && (
-              <p className="text-[11px] leading-5 text-muted-foreground">
+              <p className="text-xs leading-5 text-muted-foreground">
                 برای پیاده‌روی، مسیرها با سرویس پیاده گرفته می‌شوند؛ سرویس بهینه‌سازی رسمی فقط برای
                 خودرو/موتور است، بنابراین ترتیب ایست‌ها تخمینی است.
               </p>
@@ -430,7 +438,7 @@ export function PlanPage() {
                 title="مسیر خرید"
               />
               {routing && (
-                <p className="pointer-events-none absolute top-3 start-3 z-10 flex items-center gap-1.5 rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow">
+                <p className="pointer-events-none absolute top-3 start-3 z-10 flex items-center gap-1.5 rounded-full border-line border-border bg-card/95 px-3 py-1.5 text-xs text-muted-foreground shadow-float">
                   <Loader2 className="size-3.5 animate-spin text-brand" strokeWidth={2} aria-hidden />
                   در حال گرفتن مسیر خیابانی…
                 </p>
@@ -446,7 +454,7 @@ export function PlanPage() {
           )}
 
           {routeError && (
-            <div className="flex flex-wrap items-start gap-2 rounded-surface border-line border-warning/40 bg-warning/10 p-3 text-xs leading-6 text-warning">
+            <div className="flex flex-wrap items-start gap-2 rounded-surface border-line border-warning/25 bg-warning/5 p-3 text-xs leading-6 text-warning">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={1.5} aria-hidden />
               <p className="min-w-0 flex-1" role="alert">
                 {routeError} برنامهٔ خرید بدون مسیر خیابانی نمایش داده می‌شود؛ خط مستقیم جای مسیر جا زده
@@ -475,7 +483,7 @@ export function PlanPage() {
           )}
 
           {route && (route.warnings.length > 0 || route.excluded.length > 0) && (
-            <div className="flex flex-col gap-1 rounded-lg bg-secondary p-3 text-[11px] leading-5 text-muted-foreground">
+            <div className="flex flex-col gap-1 rounded-lg bg-secondary p-3 text-xs leading-5 text-muted-foreground">
               {route.warnings.map((warning) => (
                 <p key={warning}>{warning}</p>
               ))}
@@ -522,8 +530,8 @@ export function PlanPage() {
 
 function RouteFact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border-line border-border bg-card p-2">
-      <p className="text-[11px] text-muted-foreground">{label}</p>
+    <div className="rounded-control border-line border-border bg-card p-2 shadow-control">
+      <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-sm font-semibold">{value}</p>
     </div>
   );

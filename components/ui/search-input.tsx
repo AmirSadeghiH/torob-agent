@@ -64,7 +64,7 @@ export function SearchInput({
       className={cn(
         "flex w-full items-center gap-2 rounded-field border-line-field border-input bg-field shadow-field text-sm transition-colors",
         "focus-within:border-transparent focus-within:ring-2 focus-within:ring-ring/60",
-        sm ? "h-8 px-2.5" : "h-10 px-3",
+        sm ? "h-8 px-2.5" : "h-11 px-3",
         disabled && "cursor-not-allowed opacity-50",
         className,
       )}
@@ -100,12 +100,12 @@ export function SearchInput({
           tabIndex={-1}
           disabled={disabled}
           onClick={() => { set("", true); ref.current?.focus(); }}
-          className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <X className="size-3.5" />
         </button>
       ) : shortcut ? (
-        <kbd dir="ltr" className="hidden shrink-0 rounded border border-border bg-muted px-1.5 font-mono text-[11px] leading-5 text-muted-foreground sm:inline-block">
+        <kbd dir="ltr" className="hidden shrink-0 rounded border border-border bg-muted px-1.5 font-mono text-xs leading-5 text-muted-foreground sm:inline-block">
           {shortcut}
         </kbd>
       ) : null}

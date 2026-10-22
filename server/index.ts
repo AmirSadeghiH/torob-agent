@@ -48,7 +48,7 @@ if (isProduction) {
 }
 
 app.listen(port, "127.0.0.1", () => {
-  console.log(`هم‌خرید API روی http://127.0.0.1:${port} — داده: ${path.basename(dbPath)}`);
+  console.log(`ترب‌یار API روی http://127.0.0.1:${port} — داده: ${path.basename(dbPath)}`);
   if (!isProduction) {
     console.log("حالت توسعه: رابط کاربری جداگانه روی Vite اجرا می‌شود.");
   }

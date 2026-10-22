@@ -6,8 +6,8 @@ import {
   Check,
   ChevronLeft,
   MapPin,
-  MessageCircle,
   Plus,
+  Sparkles,
   ShieldCheck,
   Store,
 } from "lucide-react";
@@ -181,7 +181,7 @@ export function ProductPage() {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
-          <div className="overflow-hidden rounded-surface border-line border-border bg-card">
+          <div className="overflow-hidden rounded-surface border-line border-border bg-card shadow-surface">
             <ProductImage src={product.image} alt={product.title} eager className="aspect-4/3" />
             {product.images.length > 1 && (
               <div className="flex gap-2 p-3">
@@ -223,7 +223,7 @@ export function ProductPage() {
         </div>
 
         <aside className="flex flex-col gap-4">
-          <section className="flex flex-col gap-3 rounded-surface border-line border-border bg-card p-4 lg:sticky lg:top-20">
+          <section className="flex flex-col gap-3 rounded-surface border-line border-border bg-card p-4 shadow-surface lg:sticky lg:top-20">
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <Link
                 to={`/explore?category=${encodeURIComponent(product.category)}`}
@@ -246,7 +246,7 @@ export function ProductPage() {
             <div className="flex flex-col gap-1">
               <p className="flex flex-wrap items-baseline gap-2">
                 <span className="text-xs text-muted-foreground">از</span>
-                <span className="text-2xl font-bold tabular-nums">
+                <span className="text-2xl font-bold tabular-nums text-foreground">
                   {product.min_price === null ? "—" : formatToman(product.min_price)}
                 </span>
               </p>
@@ -266,19 +266,19 @@ export function ProductPage() {
             )}
 
             <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg bg-secondary p-2">
+              <div className="rounded-control border-line border-border bg-background/60 p-2">
                 <p className="text-xs text-muted-foreground">کمترین</p>
                 <p className="mt-0.5 text-sm font-semibold tabular-nums">
                   {product.market.min === null ? "—" : formatToman(product.market.min)}
                 </p>
               </div>
-              <div className="rounded-lg bg-secondary p-2">
+              <div className="rounded-control border-line border-border bg-background/60 p-2">
                 <p className="text-xs text-muted-foreground">میانه</p>
                 <p className="mt-0.5 text-sm font-semibold tabular-nums">
                   {product.market.median === null ? "—" : formatToman(product.market.median)}
                 </p>
               </div>
-              <div className="rounded-lg bg-secondary p-2">
+              <div className="rounded-control border-line border-border bg-background/60 p-2">
                 <p className="text-xs text-muted-foreground">اختلاف</p>
                 <p className="mt-0.5 text-sm font-semibold tabular-nums">
                   {product.market.spread_percent === null ? "—" : `${fa(product.market.spread_percent)}٪`}
@@ -301,7 +301,7 @@ export function ProductPage() {
                   )
                 }
               >
-                <MessageCircle className="size-4" strokeWidth={1.5} aria-hidden />
+                <Sparkles className="size-4 text-brand" strokeWidth={1.5} aria-hidden />
                 پرسیدن از دستیار
               </Button>
             </div>
@@ -328,7 +328,7 @@ export function ProductPage() {
               </>
             )}
 
-            <p className="rounded-lg bg-secondary p-2 text-xs leading-6 text-muted-foreground">
+            <p className="rounded-control bg-secondary p-3 text-xs leading-6 text-muted-foreground">
               قیمت ثبت‌شدهٔ دیتاست است، نه قیمت فعلی یا موجودی زنده. تاریخ آخرین تغییر قیمت کنار پیشنهادها آمده است؛ برای اطمینان، قیمت و موجودی را از منبع دیگری بررسی کنید.
             </p>
           </section>

@@ -2,59 +2,61 @@
 
 /* Vazirmatn is bundled by @fontsource-variable/vazirmatn (no CDN, works offline in Iran). */
 
-/* --- vibefarsi:theme-graphite --- */
-/* گرافیت، مینیمال فنی و تم پیش‌فرض. این بلوک را در :root بگذارید. */
+/* --- torbyar:theme-paper-red --- */
+/* ترب‌یار: سفید، خاکستری‌های خنثی و قرمز ترب. تم روشن و آرام برای یک ایجنت خرید. */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
   /* رنگ */
-  --background: oklch(0.115 0.002 285);
-  --foreground: oklch(0.975 0 0);
-  --card: oklch(0.14 0.002 285);
-  --card-foreground: oklch(0.975 0 0);
-  --popover: oklch(0.16 0.002 285);
-  --popover-foreground: oklch(0.975 0 0);
-  --primary: oklch(0.975 0 0);
-  --primary-foreground: oklch(0.13 0 0);
-  --secondary: oklch(0.2 0.002 285);
-  --secondary-foreground: oklch(0.975 0 0);
-  --muted: oklch(0.175 0.002 285);
-  --muted-foreground: oklch(0.63 0.004 285);
-  --accent: oklch(0.2 0.002 285);
-  --accent-foreground: oklch(0.975 0 0);
-  --destructive: oklch(0.65 0.2 25);
-  --success: oklch(0.75 0.16 160);
-  --warning: oklch(0.82 0.16 80);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 11%);
-  --ring: oklch(0.7 0 0);
-  --brand: oklch(0.8 0.165 65);
-  --brand-foreground: oklch(0.22 0.06 60);
+  --background: oklch(0.981 0.002 265);
+  --foreground: oklch(0.235 0.012 265);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.235 0.012 265);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.235 0.012 265);
+  --primary: oklch(0.575 0.225 26.5);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.965 0.003 265);
+  --secondary-foreground: oklch(0.3 0.012 265);
+  --muted: oklch(0.955 0.003 265);
+  --muted-foreground: oklch(0.505 0.012 265);
+  --accent: oklch(0.965 0.007 25);
+  --accent-foreground: oklch(0.3 0.03 25);
+  --destructive: oklch(0.55 0.2 27);
+  --success: oklch(0.52 0.14 155);
+  --warning: oklch(0.56 0.13 70);
+  --border: oklch(0.912 0.005 265);
+  --input: oklch(0.885 0.006 265);
+  --ring: oklch(0.575 0.225 26.5);
+  --brand: oklch(0.575 0.225 26.5);
+  --brand-foreground: oklch(1 0 0);
 
   /* زبان طراحی: فونت، فرم، خط، عمق، حرکت و تراکم */
-  --radius: 0.625rem;
+  --radius: 0.75rem;
   --type-display-weight: 700;
-  --shape-control: calc(var(--radius) - 2px);
-  --shape-field: calc(var(--radius) - 2px);
-  --shape-surface: calc(var(--radius) + 12px);
-  --shape-overlay: calc(var(--radius) + 4px);
+  --shape-control: 0.625rem;
+  --shape-field: 0.625rem;
+  --shape-surface: 1rem;
+  --shape-overlay: 0.875rem;
   --line: 1px;
   --line-field: 1px;
   --line-style: solid;
-  --field: color-mix(in oklch, var(--background) 60%, transparent);
-  --depth-control: 0 0 #0000;
-  --depth-press: 0 0 #0000;
-  --depth-field: 0 0 #0000;
-  --depth-surface: 0 1px 0 0 oklch(1 0 0 / 6%) inset;
-  --depth-overlay: 0 20px 50px -20px oklch(0 0 0 / 80%);
+  --field: oklch(1 0 0);
+  --depth-control: 0 1px 2px 0 oklch(0.24 0.02 265 / 5%);
+  --depth-press: inset 0 1px 2px 0 oklch(0.24 0.02 265 / 9%);
+  --depth-field: 0 1px 1px 0 oklch(0.24 0.02 265 / 3%);
+  --depth-surface: 0 1px 2px 0 oklch(0.24 0.02 265 / 4%), 0 1px 3px 0 oklch(0.24 0.02 265 / 3%);
+  --depth-float: 0 12px 32px -18px oklch(0.24 0.02 265 / 22%), 0 2px 6px -2px oklch(0.24 0.02 265 / 6%);
+  --depth-overlay: 0 24px 60px -24px oklch(0.24 0.02 265 / 26%), 0 2px 8px -2px oklch(0.24 0.02 265 / 8%);
   --surface-filter: none;
-  --press: scale(0.98);
-  --motion: 200ms;
-  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+  --press: scale(0.985);
+  --motion: 180ms;
+  --motion-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --backdrop: none;
+  --wash: radial-gradient(52rem 24rem at 92% -24%, oklch(0.94 0.035 25 / 70%), transparent 72%);
   --spacing: 0.25rem;
 }
-/* --- vibefarsi:theme-graphite-end --- */
+/* --- torbyar:theme-paper-red-end --- */
 
 /* --- vibefarsi:tailwind-map --- */
 @theme inline {
@@ -97,6 +99,7 @@
   --shadow-press: var(--depth-press);
   --shadow-field: var(--depth-field);
   --shadow-surface: var(--depth-surface);
+  --shadow-float: var(--depth-float);
   --shadow-overlay: var(--depth-overlay);
   --ease-motion: var(--motion-ease);
   --font-display: var(--type-display);
@@ -104,11 +107,12 @@
 
 @layer base {
   body {
-    font-size: 16.5px;
+    font-size: 16px;
     line-height: 1.8;
     letter-spacing: 0;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
     font-family: var(--type-body, inherit);
     background-image: var(--backdrop, none);
   }
@@ -140,7 +144,7 @@
 }
 /* --- vibefarsi:font-end --- */
 
-/* --- hamkharid:app-layer --- */
+/* --- torbyar:app-layer --- */
 @layer base {
   html {
     background: var(--background);
@@ -168,10 +172,10 @@
 @layer utilities {
   /* Named motion: a short rise, staggered by importance, disabled on request. */
   .rise {
-    animation: hk-rise 240ms var(--motion-ease) both;
+    animation: ty-rise 240ms var(--motion-ease) both;
   }
   .stagger > * {
-    animation: hk-rise 240ms var(--motion-ease) both;
+    animation: ty-rise 240ms var(--motion-ease) both;
   }
   .stagger > *:nth-child(2) { animation-delay: 40ms; }
   .stagger > *:nth-child(3) { animation-delay: 80ms; }
@@ -181,9 +185,42 @@
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem); }
+
+  /* Sits the composer above the mobile tab bar, safe area included. */
+  .above-nav { bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
+  @media (min-width: 1024px) {
+    .above-nav { bottom: 0; }
+  }
+
+  /* A quiet red wash behind the agent's welcome, like light on paper. */
+  .agent-wash {
+    background-image: var(--wash);
+  }
+
+  /* Fine hairline grid for tool/agent surfaces; fades toward the bottom. */
+  .agent-grid {
+    background-image:
+      linear-gradient(to right, var(--border) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+    background-size: 32px 32px;
+    -webkit-mask-image: linear-gradient(to bottom, oklch(0 0 0 / 35%), transparent 85%);
+    mask-image: linear-gradient(to bottom, oklch(0 0 0 / 35%), transparent 85%);
+  }
+
+  .card-lift {
+    transition:
+      box-shadow var(--motion) var(--motion-ease),
+      border-color var(--motion) var(--motion-ease),
+      transform var(--motion) var(--motion-ease);
+  }
+  .card-lift:hover {
+    box-shadow: var(--depth-float);
+    border-color: color-mix(in oklch, var(--brand) 28%, var(--border));
+    transform: translateY(-2px);
+  }
 }
 
-@keyframes hk-rise {
+@keyframes ty-rise {
   from {
     opacity: 0;
     transform: translateY(8px);
@@ -202,5 +239,8 @@
   .stagger > * {
     animation: none;
   }
+  .card-lift:hover {
+    transform: none;
+  }
 }
-/* --- hamkharid:app-layer-end --- */
+/* --- torbyar:app-layer-end --- */

@@ -10,14 +10,14 @@ const variants: Record<Variant, string> = {
   outline: "border-line border-input bg-transparent hover:bg-accent hover:text-accent-foreground shadow-control active:shadow-press",
   ghost: "hover:bg-accent hover:text-accent-foreground",
   brand: "bg-brand text-brand-foreground hover:bg-brand/90 shadow-control active:shadow-press",
-  destructive: "bg-destructive text-white hover:bg-destructive/90 shadow-control active:shadow-press",
+  destructive: "bg-destructive text-brand-foreground hover:bg-destructive/90 shadow-control active:shadow-press",
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-8 px-3 text-[13px] gap-1.5",
-  md: "h-10 px-4 text-sm gap-2",
+  sm: "h-9 px-3 text-sm gap-1.5",
+  md: "h-11 px-4 text-sm gap-2",
   lg: "h-12 px-6 text-base gap-2.5",
-  icon: "size-10",
+  icon: "size-11",
 };
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

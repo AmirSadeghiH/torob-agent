@@ -141,7 +141,7 @@ export function StorePage() {
       </nav>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <section className="flex flex-col gap-3 rounded-surface border-line border-border bg-card p-5">
+        <section className="flex flex-col gap-3 rounded-surface border-line border-border bg-card p-5 shadow-surface">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <h1 className="text-xl font-bold sm:text-2xl">{shop.name}</h1>
@@ -157,11 +157,11 @@ export function StorePage() {
             </div>
             <span
               className={cn(
-                "rounded-full px-2 py-1 text-xs",
+                "rounded-full px-2.5 py-1 text-xs font-medium",
                 shop.open_now === true
-                  ? "bg-success/15 text-success"
+                  ? "bg-success/10 text-success"
                   : shop.open_now === false
-                    ? "bg-destructive/15 text-destructive"
+                    ? "bg-destructive/10 text-destructive"
                     : "bg-secondary text-muted-foreground",
               )}
             >
@@ -171,7 +171,7 @@ export function StorePage() {
 
           {shop.address && <p className="text-sm leading-7 text-muted-foreground">{shop.address}</p>}
 
-          <p className="rounded-lg bg-secondary p-2 text-xs leading-6 text-muted-foreground">
+          <p className="rounded-control bg-secondary p-3 text-xs leading-6 text-muted-foreground">
             {shop.identity === "registered"
               ? "نام و لینک‌های این فروشگاه از فیلدهای ثبت‌شدهٔ دیتاست است؛ تأیید مستقل کسب‌وکار نیست. شمارهٔ تلفن در این دیتاست معتبر نیست و نمایش داده نمی‌شود."
               : "نام این فروشگاه در دیتاست ناشناس شده است؛ شناسهٔ کوتاه داخل نام فقط برای ارجاع پایدار است و شمارهٔ تماس معتبری برای آن وجود ندارد."}
@@ -223,7 +223,7 @@ export function StorePage() {
                 <Link
                   key={category}
                   to={`/explore?category=${encodeURIComponent(category)}`}
-                  className="rounded-full bg-secondary px-2 py-1 text-xs text-secondary-foreground hover:bg-accent"
+                  className="rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground hover:bg-accent"
                 >
                   {category}
                 </Link>
@@ -241,7 +241,7 @@ export function StorePage() {
             </div>
           )}
 
-          <section className="rounded-surface border-line border-border bg-card p-4">
+          <section className="rounded-surface border-line border-border bg-card p-4 shadow-surface">
             <h2 className="flex items-center gap-2 text-sm font-semibold">
               <Clock className="size-4" strokeWidth={1.5} aria-hidden />
               ساعت کاری
@@ -284,7 +284,7 @@ export function StorePage() {
             برای این فروشگاه پیشنهادی در داده ثبت نشده است.
           </p>
         ) : (
-          <div className="flex flex-col divide-y divide-border rounded-surface border-line border-border bg-card">
+          <div className="flex flex-col divide-y divide-border overflow-hidden rounded-surface border-line border-border bg-card shadow-surface">
             {shop.top_products.map((product) => (
               <Link
                 key={product.product_id}
@@ -305,7 +305,7 @@ export function StorePage() {
         )}
       </section>
 
-      <section className="rounded-surface border-line border-border bg-card p-4">
+      <section className="rounded-surface border-line border-border bg-card p-4 shadow-surface">
         <h2 className="text-sm font-semibold">پرداخت</h2>
         <p className="mt-1 text-xs leading-6 text-muted-foreground">
           {shop.payments.length > 0

@@ -26,8 +26,8 @@ function toggleClass(on: boolean, variant: Variant, size: Size, sliding: boolean
         ? "text-foreground"
         : "text-muted-foreground hover:text-foreground"
       : on
-        ? "bg-secondary text-foreground"
-        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+        ? "bg-brand/8 text-brand"
+        : "text-muted-foreground hover:bg-accent hover:text-foreground",
   );
 }
 
@@ -172,7 +172,7 @@ export function ToggleGroup(props: ToggleGroupProps) {
       {sliding && pill ? (
         <span
           aria-hidden
-          className="absolute inset-y-0.5 -z-10 rounded-control bg-background shadow-sm ring-1 ring-border transition-[transform,width] duration-(--motion) ease-motion"
+          className="absolute inset-y-0.5 -z-10 rounded-control bg-card shadow-control ring-1 ring-border transition-[transform,width] duration-(--motion) ease-motion"
           style={{ width: pill.w, left: 0, transform: `translateX(${pill.x}px)` }}
         />
       ) : null}

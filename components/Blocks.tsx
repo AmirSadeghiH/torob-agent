@@ -48,7 +48,7 @@ export function BlockView({ block }: { block: Block }) {
           </div>
           <Link
             to="/explore"
-            className="inline-flex h-11 w-fit items-center gap-1.5 rounded-control px-1 text-sm text-brand hover:underline"
+            className="inline-flex h-11 w-fit items-center gap-1.5 rounded-full border-line border-border bg-card px-3 text-sm text-foreground shadow-control transition-colors hover:border-brand/30 hover:text-brand"
           >
             دیدن همه در کاوش
             <ArrowLeft className="size-4" strokeWidth={1.5} aria-hidden />
@@ -72,7 +72,7 @@ export function BlockView({ block }: { block: Block }) {
           </div>
           <Link
             to={`/p/${block.product_id}`}
-            className="inline-flex h-11 w-fit items-center gap-1.5 rounded-control px-1 text-sm text-brand hover:underline"
+            className="inline-flex h-11 w-fit items-center gap-1.5 rounded-full border-line border-border bg-card px-3 text-sm text-foreground shadow-control transition-colors hover:border-brand/30 hover:text-brand"
           >
             صفحهٔ کامل کالا و مشخصات
             <ArrowLeft className="size-4" strokeWidth={1.5} aria-hidden />
@@ -126,7 +126,7 @@ export function BlockView({ block }: { block: Block }) {
           <PlanView plan={block.plan}>
             <Link
               to="/plan"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-control border-line border-border bg-secondary px-4 text-sm font-medium hover:bg-accent"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-control border-line border-border bg-card px-4 text-sm font-medium shadow-control transition-colors hover:border-brand/30 hover:bg-accent"
             >
               ویرایش در برنامهٔ خرید
             </Link>
@@ -140,7 +140,7 @@ export function BlockView({ block }: { block: Block }) {
           <SectionHeader title={block.title} />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {block.items.map((item) => (
-              <div key={item.label} className="rounded-xl border-line border-border bg-card p-3">
+              <div key={item.label} className="rounded-control border-line border-border bg-card p-3 shadow-surface">
                 <p className="text-xs text-muted-foreground">{item.label}</p>
                 <p
                   className={cn(
@@ -162,23 +162,25 @@ export function BlockView({ block }: { block: Block }) {
     case "note": {
       const tone =
         block.tone === "warn"
-          ? { Icon: AlertTriangle, className: "border-warning/40 bg-warning/10 text-warning" }
+          ? { Icon: AlertTriangle, tile: "bg-warning/10 text-warning", className: "border-warning/25 bg-warning/5" }
           : block.tone === "success"
-            ? { Icon: CheckCircle2, className: "border-success/40 bg-success/10 text-success" }
-            : { Icon: Info, className: "border-border bg-secondary text-muted-foreground" };
+            ? { Icon: CheckCircle2, tile: "bg-success/10 text-success", className: "border-success/25 bg-success/5" }
+            : { Icon: Info, tile: "bg-secondary text-muted-foreground", className: "border-border bg-secondary/60" };
       return (
-        <div className={cn("flex gap-2 rounded-xl border-line p-3 text-sm leading-7", tone.className)}>
-          <tone.Icon className="mt-1 size-4 shrink-0" strokeWidth={1.5} aria-hidden />
+        <div className={cn("flex gap-3 rounded-surface border-line p-3 text-sm leading-7", tone.className)}>
+          <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-control", tone.tile)}>
+            <tone.Icon className="size-4" strokeWidth={1.5} aria-hidden />
+          </span>
           <div className="min-w-0 flex-1">
-            {block.title && <p className="font-medium text-foreground">{block.title}</p>}
-            <p className={block.title ? "text-muted-foreground" : ""}>{block.body}</p>
+            {block.title && <p className="font-semibold text-foreground">{block.title}</p>}
+            <p className="text-foreground/80">{block.body}</p>
             {block.actions && block.actions.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {block.actions.map((action) => (
                   <Link
                     key={action.to}
                     to={action.to}
-                    className="inline-flex h-10 items-center rounded-control border-line border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-accent"
+                    className="inline-flex h-10 items-center rounded-full border-line border-border bg-card px-3 text-xs font-medium text-foreground hover:border-brand/30 hover:bg-accent"
                   >
                     {action.label}
                   </Link>
@@ -197,8 +199,11 @@ export function BlockView({ block }: { block: Block }) {
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border pb-2">
+      <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <span className="size-1.5 rounded-full bg-brand" aria-hidden />
+        {title}
+      </h3>
       {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
     </div>
   );
@@ -208,10 +213,10 @@ function CompareBlock({ block }: { block: Extract<Block, { type: "compare" }> })
   return (
     <section className="flex flex-col gap-3">
       <SectionHeader title={block.title} subtitle={block.subtitle} />
-      <div className="overflow-x-auto rounded-surface border-line border-border bg-card">
+      <div className="overflow-x-auto rounded-surface border-line border-border bg-card shadow-surface">
         <table className="w-full min-w-max text-sm">
           <thead>
-            <tr className="border-b border-border">
+            <tr className="border-b border-border bg-secondary/50">
               <th scope="col" className="sticky start-0 bg-card p-3 text-start text-xs font-medium text-muted-foreground">
                 ویژگی
               </th>
@@ -220,7 +225,7 @@ function CompareBlock({ block }: { block: Extract<Block, { type: "compare" }> })
                   <Link to={`/p/${column.product_id}`} className="flex flex-col gap-2 hover:text-brand">
                     <span className="text-sm font-medium leading-6">{column.title}</span>
                     <span className="text-xs text-muted-foreground">{column.brand ?? column.neighborhood ?? "—"}</span>
-                    <span className="text-base font-bold tabular-nums">
+                    <span className="text-base font-bold tabular-nums text-brand">
                       {column.price === null ? "—" : formatToman(column.price)}
                     </span>
                   </Link>
@@ -239,7 +244,7 @@ function CompareBlock({ block }: { block: Extract<Block, { type: "compare" }> })
                     key={index}
                     className={cn(
                       "p-3 align-top text-sm",
-                      row.best_index === index && "bg-brand/10 font-semibold text-brand",
+                      row.best_index === index && "bg-brand/5 font-semibold text-brand",
                     )}
                   >
                     {value ?? "—"}
@@ -284,7 +289,7 @@ function FiltersBlock({ block }: { block: Extract<Block, { type: "filters" }> })
   };
 
   return (
-    <section className="flex flex-col gap-3 rounded-surface border-line border-border bg-card p-4">
+    <section className="flex flex-col gap-3 rounded-surface border-line border-border bg-card p-4 shadow-surface">
       <div className="flex items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <SlidersHorizontal className="size-4" strokeWidth={1.5} aria-hidden />

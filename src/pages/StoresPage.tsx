@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, Store } from "lucide-react";
+import { ArrowDown, MapPin, Store } from "lucide-react";
 import type { StoreCard } from "@/shared/types";
 import { api, ApiError } from "@/lib/api";
 import { useAppMeta, useOrigin } from "@/lib/app-state";
@@ -110,14 +110,21 @@ export function StoresPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <header className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold sm:text-2xl">فروشگاه‌های تهران</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-2">
+          <p className="inline-flex w-fit items-center gap-1.5 rounded-full bg-brand/5 px-2.5 py-1 text-xs font-medium text-brand">
+            <Store className="size-3.5" strokeWidth={2} aria-hidden />
+            نقشهٔ فروشگاه‌ها
+          </p>
+          <h1 className="text-2xl font-bold">فروشگاه‌های تهران</h1>
+          <p className="text-sm text-muted-foreground">
             {loading ? "در حال بارگذاری…" : `${faNumber(total)} فروشگاه در ۹ کیلومتری نقطهٔ شروع`}
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">فاصله از {origin.label ?? "فردوسی"}</p>
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <MapPin className="size-3.5 text-brand" strokeWidth={1.5} aria-hidden />
+          فاصله از {origin.label ?? "فردوسی"}
+        </p>
       </header>
 
       <SearchInput
@@ -139,7 +146,7 @@ export function StoresPage() {
               "flex h-11 items-center rounded-full border-line px-3 text-xs transition-colors",
               sort === option.value
                 ? "border-brand bg-brand text-brand-foreground"
-                : "border-border bg-card hover:bg-accent",
+                : "border-border bg-card hover:border-brand/30 hover:bg-accent",
             )}
           >
             {option.label}
@@ -176,7 +183,7 @@ export function StoresPage() {
       </div>
 
       {error && (
-        <div role="alert" className="rounded-xl border-line border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <div role="alert" className="rounded-surface border-line border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">
           {error}
         </div>
       )}
@@ -184,7 +191,7 @@ export function StoresPage() {
       {loading ? (
         <div className="grid gap-3 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-40 animate-pulse rounded-surface bg-card" />
+            <div key={index} className="h-40 animate-pulse rounded-surface border-line border-border bg-card" />
           ))}
         </div>
       ) : items.length === 0 ? (

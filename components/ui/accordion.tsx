@@ -21,7 +21,7 @@ export function Accordion({ items, multiple, defaultOpen = [], className }: Acco
     setOpen((o) => (o.includes(id) ? o.filter((x) => x !== id) : multiple ? [...o, id] : [id]));
 
   return (
-    <div className={cn("divide-y divide-border rounded-xl border border-border bg-card", className)}>
+    <div className={cn("divide-y divide-border overflow-hidden rounded-surface border-line border-border bg-card shadow-surface", className)}>
       {items.map((it) => {
         const isOpen = open.includes(it.id);
         return (
@@ -32,7 +32,7 @@ export function Accordion({ items, multiple, defaultOpen = [], className }: Acco
                 aria-expanded={isOpen}
                 aria-controls={`acc-${it.id}`}
                 onClick={() => toggle(it.id)}
-                className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-start text-sm font-medium transition-colors hover:bg-accent/40"
+                className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-start text-sm font-medium transition-colors hover:bg-accent"
               >
                 {it.title}
                 <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />

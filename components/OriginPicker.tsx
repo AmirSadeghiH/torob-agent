@@ -40,7 +40,7 @@ export function OriginPicker() {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`نقطهٔ شروع: ${origin.label ?? "فردوسی"}. تغییر محله`}
-        className="flex h-11 max-w-40 items-center gap-1.5 rounded-full border-line border-border bg-secondary px-3 text-xs text-foreground transition-colors hover:bg-accent"
+        className="flex h-11 max-w-28 items-center gap-1.5 rounded-full border-line border-border bg-card px-3 text-xs text-foreground shadow-control transition-colors hover:border-brand/30 hover:bg-accent sm:max-w-40"
       >
         <MapPin className="size-4 shrink-0 text-brand" strokeWidth={1.5} aria-hidden />
         <span className="truncate">{origin.label ?? "فردوسی"}</span>
@@ -51,7 +51,7 @@ export function OriginPicker() {
         <div
           role="listbox"
           aria-label="انتخاب محله"
-          className="absolute end-0 top-full z-50 mt-2 w-72 max-h-96 overflow-auto rounded-overlay border-line border-border bg-popover p-2 shadow-overlay"
+          className="absolute end-0 top-full z-50 mt-2 max-h-96 w-72 overflow-auto rounded-overlay border-line border-border bg-popover p-2 shadow-overlay"
         >
           <p className="px-2 py-1 text-xs text-muted-foreground">
             فاصله‌ها از این نقطه حساب می‌شود

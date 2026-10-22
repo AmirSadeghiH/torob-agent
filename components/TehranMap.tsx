@@ -52,7 +52,8 @@ const PROVIDER_LABEL = PROVIDER === "mapir" ? "Map.ir" : PROVIDER === "neshan" ?
 
 const MAPIR_STYLE = `https://map.ir/vector/styles/main/mapir-xyz-style.json?x-api-key=${MAPIR_KEY}`;
 const NESHAN_STYLE = "https://static.neshan.org/sdk/maplibre/styles/dark.json";
-const ROUTE_COLOR = "#f2a93b";
+/** ترب‌یار red — MapLibre paint needs a concrete color, not a CSS variable. */
+const ROUTE_COLOR = "#DF1723";
 const LOAD_TIMEOUT_MS = 12_000;
 /** MapLibre only accepts one RTL plugin registration per page. */
 let rtlPluginRegistered = false;
@@ -252,11 +253,11 @@ export function TehranMap({
     if (origin) {
       const element = document.createElement("div");
       element.className =
-        "relative flex size-11 items-center justify-center rounded-full border-2 border-brand bg-background/90 text-brand shadow-lg";
+        "relative flex size-11 items-center justify-center rounded-full border-2 border-brand bg-card text-brand shadow-lg";
       element.setAttribute("aria-hidden", "true");
       element.innerHTML =
         '<span class="absolute inline-flex size-11 animate-ping rounded-full bg-brand/30"></span>' +
-        '<span class="relative flex size-5 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-brand-foreground">ش</span>';
+        '<span class="relative flex size-5 items-center justify-center rounded-full bg-brand text-xs font-bold text-brand-foreground">ش</span>';
       element.title = `نقطهٔ شروع: ${origin.label ?? "فردوسی"}`;
       addMarker(element, origin.lon, origin.lat);
     }
@@ -277,7 +278,7 @@ export function TehranMap({
         "flex size-9 items-center justify-center rounded-full border-2 text-xs font-bold shadow-lg transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
       element.className = isSelected
         ? `${base} scale-110 border-brand bg-brand text-brand-foreground`
-        : `${base} border-background bg-foreground text-background hover:scale-105`;
+        : `${base} border-card bg-foreground text-background hover:scale-105`;
       element.textContent = order >= 0 ? fa(order + 1) : "•";
       element.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -320,7 +321,7 @@ export function TehranMap({
         type: "line",
         source: "route",
         layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#0b0b0c", "line-width": 9, "line-opacity": 0.55 },
+        paint: { "line-color": "#FFFFFF", "line-width": 9, "line-opacity": 0.9 },
       });
       map.addLayer({
         id: "route-line",
@@ -428,7 +429,7 @@ export function TehranMap({
         <button
           type="button"
           onClick={() => setFitNonce((value) => value + 1)}
-          className="absolute bottom-3 start-3 z-10 flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-control border-line border-border bg-background/90 px-3 text-xs font-medium text-foreground shadow-lg backdrop-blur hover:bg-accent"
+          className="absolute bottom-3 start-3 z-10 flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-control border-line border-border bg-card/95 px-3 text-xs font-medium text-foreground shadow-float backdrop-blur hover:bg-accent"
           aria-label="نمایش همهٔ نقاط و مسیر"
         >
           <Locate className="size-4" strokeWidth={1.5} aria-hidden />

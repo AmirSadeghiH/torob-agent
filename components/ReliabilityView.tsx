@@ -15,10 +15,10 @@ export function ReliabilityView({ offer, productTitle }: { offer: OfferView; pro
           : { bar: "bg-destructive", text: "text-destructive", Icon: ShieldQuestion };
 
   return (
-    <div className="flex flex-col gap-4 rounded-surface border-line border-border bg-card p-4">
+    <div className="flex flex-col gap-4 rounded-surface border-line border-border bg-card p-4 shadow-surface">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="flex size-11 items-center justify-center rounded-full bg-secondary">
+          <span className="flex size-11 items-center justify-center rounded-control bg-secondary">
             <tone.Icon className={cn("size-5", tone.text)} strokeWidth={1.5} aria-hidden />
           </span>
           <div>
