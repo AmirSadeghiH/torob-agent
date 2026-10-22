@@ -8,6 +8,7 @@ import type {
 } from "../shared/types";
 import { dbHealth, getMeta, getOffer, getProduct, getShop, searchProducts, searchShops } from "./repo";
 import { buildPlan } from "./plan";
+import { RouteError, buildRoute, isTravelMode } from "./routing";
 import { respond } from "./assistant";
 import { normalizeHistory } from "./ai-config";
 
@@ -171,6 +172,37 @@ api.post("/plan", wrap((req, res) => {
     return;
   }
   res.json(plan);
+}));
+
+api.post("/route", wrap(async (req, res) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  if (!Array.isArray(body.shop_ids)) throw new BadRequest("shop_ids must be an array");
+  const shopIds = body.shop_ids
+    .filter((id): id is string => typeof id === "string" && id.length > 0 && id.length <= 64)
+    .slice(0, 20);
+  if (shopIds.length === 0) throw new BadRequest("shop_ids is empty");
+  if (!isTravelMode(body.mode)) throw new BadRequest("mode must be walk, car or motorcycle");
+  const origin = originFrom(body.origin);
+  if (!origin) throw new BadRequest("origin is required");
+
+  try {
+    const route = await buildRoute({
+      shop_ids: shopIds,
+      origin,
+      mode: body.mode,
+      optimize: body.optimize !== false,
+      return_to_origin: body.return_to_origin === true,
+      alternative: body.alternative === true,
+    });
+    res.setHeader("Cache-Control", "no-store");
+    res.json(route);
+  } catch (error) {
+    if (error instanceof RouteError) {
+      res.status(error.status).json({ error: error.message, code: error.code ?? null });
+      return;
+    }
+    throw error;
+  }
 }));
 
 api.post("/assistant", wrap(async (req, res) => {

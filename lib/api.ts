@@ -7,6 +7,8 @@ import type {
   Origin,
   Plan,
   ProductDetail,
+  RoutePlan,
+  TravelMode,
   SearchParams,
   SearchResult,
   ShopDetail,
@@ -87,6 +89,24 @@ export const api = {
     request<Plan>("/api/plan", {
       method: "POST",
       body: JSON.stringify({ offer_ids: offerIds, origin }),
+    }),
+
+  route: (
+    shopIds: string[],
+    origin: Origin,
+    mode: TravelMode,
+    options: { optimize?: boolean; return_to_origin?: boolean; alternative?: boolean } = {},
+  ) =>
+    request<RoutePlan>("/api/route", {
+      method: "POST",
+      body: JSON.stringify({
+        shop_ids: shopIds,
+        origin,
+        mode,
+        optimize: options.optimize,
+        return_to_origin: options.return_to_origin,
+        alternative: options.alternative,
+      }),
     }),
 
   assistant: (message: string, context: AssistantContext, history?: AssistantHistoryTurn[]) =>

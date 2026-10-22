@@ -262,6 +262,60 @@ export interface Plan {
   neighborhoods: string[];
 }
 
+/* ------------------------------------------------------- routes (Neshan) */
+
+export type TravelMode = "walk" | "car" | "motorcycle";
+
+/**
+ * Stop order provenance. `tsp` = Neshan `v3/trip` really optimized it,
+ * `nearest` = straight-line nearest-neighbour fallback (never called optimal),
+ * `fixed` = the order the client/dataset already had.
+ */
+export type RouteOptimization = "tsp" | "nearest" | "fixed";
+
+/** GeoJSON order: [longitude, latitude]. */
+export type LonLat = [number, number];
+
+export interface RouteStop {
+  shop_id: string;
+  name: string;
+  neighborhood: string | null;
+  address: string | null;
+  lat: number;
+  lon: number;
+  order: number;
+  /** From the routing service only — null when the provider returned fewer legs. */
+  distance_from_prev_m: number | null;
+  duration_from_prev_s: number | null;
+}
+
+export interface RoutePlan {
+  mode: TravelMode;
+  optimization: RouteOptimization;
+  /** Persian, user-facing explanation of how the stop order was decided. */
+  optimization_note: string;
+  provider: "mapir" | "neshan";
+  origin: Origin;
+  stops: RouteStop[];
+  return_to_origin: boolean;
+  /** Real road/pavement geometry from the routing provider, never a straight line. */
+  geometry: LonLat[];
+  distance_m: number;
+  duration_s: number;
+  alternatives: { index: number; distance_m: number; duration_s: number }[];
+  excluded: { shop_id: string; reason: string }[];
+  warnings: string[];
+}
+
+export interface RouteRequest {
+  shop_ids: string[];
+  origin: Origin;
+  mode: TravelMode;
+  optimize?: boolean;
+  return_to_origin?: boolean;
+  alternative?: boolean;
+}
+
 export interface ComparisonColumn {
   product_id: string;
   title: string;

@@ -893,6 +893,64 @@ export function offersForPlan(ids: string[], origin: Origin | null): PlanOfferRo
     }));
 }
 
+/** Coordinate-bearing shop rows for routing. Never invents a missing location. */
+export interface RouteShopRow {
+  shop_id: string;
+  name: string;
+  neighborhood: string | null;
+  address: string | null;
+  lat: number;
+  lon: number;
+}
+
+export function shopsByIds(ids: string[]): {
+  shops: RouteShopRow[];
+  missing: string[];
+  withoutCoords: { shop_id: string; name: string }[];
+} {
+  const unique = [...new Set(ids)].slice(0, 12);
+  if (unique.length === 0) return { shops: [], missing: [], withoutCoords: [] };
+  const placeholders = unique.map(() => "?").join(",");
+  const rows = all<ShopRow>(
+    `SELECT shop_id, name, address, neighborhood, lat, lon,
+            categories, instagram, website, payments, fast_delivery, hours, offer_count
+     FROM shops WHERE shop_id IN (${placeholders})`,
+    unique,
+  );
+  const byId = new Map(rows.map((row) => [row.shop_id, row]));
+  const shops: RouteShopRow[] = [];
+  const missing: string[] = [];
+  const withoutCoords: { shop_id: string; name: string }[] = [];
+  for (const id of unique) {
+    const row = byId.get(id);
+    if (!row) {
+      missing.push(id);
+      continue;
+    }
+    const name = shopDisplayName(row.shop_id, row.name, hasRegistryRecord(row.website, row.instagram));
+    if (
+      row.lat === null ||
+      row.lon === null ||
+      !Number.isFinite(row.lat) ||
+      !Number.isFinite(row.lon) ||
+      Math.abs(row.lat) > 90 ||
+      Math.abs(row.lon) > 180
+    ) {
+      withoutCoords.push({ shop_id: row.shop_id, name });
+      continue;
+    }
+    shops.push({
+      shop_id: row.shop_id,
+      name,
+      neighborhood: row.neighborhood,
+      address: row.address,
+      lat: row.lat,
+      lon: row.lon,
+    });
+  }
+  return { shops, missing, withoutCoords };
+}
+
 export function planItems(ids: string[], origin: Origin | null): PlanItem[] {
   return offersForPlan(ids, origin).map((o) => ({
     offer_id: o.offer_id,
