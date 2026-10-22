@@ -1,0 +1,954 @@
+import type {
+  AssistantContext,
+  AssistantRequest,
+  AssistantResponse,
+  Block,
+  ComparisonRow,
+  InsightItem,
+  MapPoint,
+  OfferView,
+  ProductCard,
+  ProductDetail,
+  SearchParams,
+  StoreCard,
+} from "../shared/types";
+import {
+  allBrandNames,
+  allCategoryNames,
+  compareColumns,
+  getMeta,
+  getProduct,
+  getProductsByIds,
+  getStoresSelling,
+  searchProducts,
+  searchShops,
+} from "./repo";
+import { parseMessage, type ParsedQuery } from "./nlu";
+import { buildPlan, planSummary } from "./plan";
+import { ageLabel, fa, faNumber, toman } from "./lib/text";
+import { distanceLabel } from "./lib/geo";
+import type { Origin } from "../shared/types";
+
+const MAX_OFFERS = 6;
+
+interface Draft {
+  reply: string;
+  blocks: Block[];
+  suggestions: string[];
+  context: AssistantContext;
+  intent: AssistantResponse["meta"]["intent"];
+  toolCalls: string[];
+  parsed: AssistantResponse["meta"]["parsed"];
+}
+
+function priceOrUnknown(value: number | null): string {
+  return value === null ? "قیمت نامشخص" : toman(value);
+}
+
+function freshnessPhrase(p: ProductCard): string {
+  if (!p.best) return "قیمت ثبت‌نشده";
+  return ageLabel(p.best.age_days);
+}
+
+function searchTitle(parsed: ParsedQuery): string {
+  if (parsed.category) {
+    return parsed.max_price
+      ? `${parsed.category} زیر ${toman(parsed.max_price)}`
+      : parsed.category;
+  }
+  if (parsed.brand) return `کالاهای ${parsed.brand}`;
+  if (parsed.q) return `نتایج «${parsed.q}»`;
+  return "پیشنهادهای قابل مقایسه";
+}
+
+function paramsFrom(parsed: ParsedQuery, extra: Partial<SearchParams> = {}): SearchParams {
+  return {
+    q: parsed.q ?? undefined,
+    category: parsed.category ?? undefined,
+    brand: parsed.brand ?? undefined,
+    neighborhood: parsed.neighborhood ?? undefined,
+    max_price: parsed.max_price ?? undefined,
+    min_price: parsed.min_price ?? undefined,
+    sort: parsed.sort ?? undefined,
+    page_size: parsed.limit,
+    ...extra,
+  };
+}
+
+function mapBlock(
+  title: string,
+  stores: StoreCard[],
+  origin: Origin,
+  routeOrder: string[] = [],
+): Block {
+  const points: MapPoint[] = stores
+    .filter((s) => s.lat !== null && s.lon !== null)
+    .map((s) => ({
+      id: s.shop_id,
+      label: s.name,
+      lat: s.lat!,
+      lon: s.lon!,
+      kind: "shop",
+      distance_m: s.distance_m,
+      meta: s.neighborhood ?? undefined,
+      order: routeOrder.indexOf(s.shop_id) >= 0 ? routeOrder.indexOf(s.shop_id) + 1 : undefined,
+    }));
+  return {
+    type: "map",
+    title,
+    subtitle: "فاصله‌ها از نقطهٔ شروع شماست.",
+    points,
+    origin,
+    route_order: routeOrder,
+  };
+}
+
+function suggestionsFor(parsed: ParsedQuery, product?: ProductDetail | null): string[] {
+  const base: string[] = [];
+  if (product) {
+    base.push("قیمت‌های همین کالا را مقایسه کن");
+    base.push("جایگزین ارزان‌تر پیشنهاد بده");
+    base.push("نزدیک‌ترین فروشگاه این کالا کجاست؟");
+    base.push("برنامهٔ خرید بچین");
+    return base.slice(0, 4);
+  }
+  const subject = parsed.category ?? parsed.q ?? "این دسته";
+  base.push(`نزدیک‌ترین فروشگاه ${subject} کجاست؟`);
+  base.push("ارزان‌ترین گزینه‌ها را نشان بده");
+  base.push("قیمت‌ها را از نظر تازگی بررسی کن");
+  base.push("برنامهٔ خرید بچین");
+  return base.slice(0, 4);
+}
+
+function insightFor(product: ProductDetail): Block {
+  const items: InsightItem[] = [
+    {
+      label: "کمترین قیمت",
+      value: priceOrUnknown(product.market.min),
+      hint: product.best ? `${product.best.shop_name}، ${product.best.neighborhood ?? ""}` : undefined,
+      tone: "good",
+    },
+    {
+      label: "میانهٔ بازار",
+      value: priceOrUnknown(product.market.median),
+      hint: `از ${fa(product.market.priced_offers)} پیشنهاد`,
+      tone: "neutral",
+    },
+    {
+      label: "اختلاف قیمت",
+      value:
+        product.market.spread_percent === null
+          ? "—"
+          : `${fa(product.market.spread_percent)}٪`,
+      hint: "بین ارزان‌ترین و گران‌ترین فروشنده",
+      tone: (product.market.spread_percent ?? 0) > 60 ? "warn" : "neutral",
+    },
+    {
+      label: "قیمت تازه",
+      value: `${fa(product.market.fresh_offers)} از ${fa(product.market.priced_offers)}`,
+      hint: "ثبت‌شده در ۳۰ روز گذشته",
+      tone: product.market.fresh_offers === 0 ? "bad" : "good",
+    },
+  ];
+  return { type: "insight", title: "نبض بازار این کالا", items };
+}
+
+function offersBlock(product: ProductDetail, limit = MAX_OFFERS): Block {
+  return {
+    type: "offers",
+    title: `پیشنهادهای ${product.title}`,
+    subtitle: `${fa(product.offers.length)} فروشگاه؛ مرتب‌شده از ارزان‌ترین`,
+    product_id: product.product_id,
+    product_title: product.title,
+    offers: product.offers.slice(0, limit),
+    best_offer_id: product.offers[0]?.offer_id ?? "",
+  };
+}
+
+function offersByPrice(offers: OfferView[]): OfferView[] {
+  return [...offers].sort((a, b) => a.price - b.price);
+}
+
+function comparisonRows(products: ProductDetail[], origin: Origin): ComparisonRow[] {
+  const columns = compareColumns(
+    products.map((p) => p.product_id),
+    origin,
+  );
+  const bestPriceIndex = columns.reduce(
+    (best, c, i) =>
+      c.price !== null && (best === null || c.price < (columns[best]?.price ?? Infinity)) ? i : best,
+    null as number | null,
+  );
+  const bestAgeIndex = columns.reduce(
+    (best, c, i) =>
+      c.age_days !== null && (best === null || c.age_days < (columns[best]?.age_days ?? Infinity))
+        ? i
+        : best,
+    null as number | null,
+  );
+
+  const rows: ComparisonRow[] = [
+    {
+      label: "کمترین قیمت",
+      values: columns.map((c) => (c.price === null ? null : toman(c.price))),
+      highlight: "lowest",
+      best_index: bestPriceIndex,
+    },
+    {
+      label: "تعداد پیشنهاد",
+      values: columns.map((c) => `${fa(c.offer_count)} فروشگاه`),
+      highlight: null,
+    },
+    {
+      label: "تازگی قیمت",
+      values: columns.map((c) => (c.age_days === null ? "نامشخص" : ageLabel(c.age_days))),
+      highlight: "freshest",
+      best_index: bestAgeIndex,
+    },
+    {
+      label: "ارزان‌ترین فروشگاه",
+      values: columns.map((c) => c.best_shop),
+      highlight: null,
+    },
+    {
+      label: "محله",
+      values: columns.map((c) => c.neighborhood),
+      highlight: null,
+    },
+  ];
+
+  const specRows: ComparisonRow[] = [];
+  const firstSpecs = products[0]?.specs ?? [];
+  for (const spec of firstSpecs) {
+    if (specRows.length >= 4) break;
+    if (!spec.key || spec.key.length > 28 || spec.value.length > 70) continue;
+    const values = products.map((p) => {
+      const found = p.specs.find((s) => s.key === spec.key);
+      return found ? found.value.slice(0, 70) : null;
+    });
+    if (values.filter(Boolean).length < 2) continue;
+    specRows.push({ label: spec.key, values, highlight: null });
+  }
+
+  return rows.concat(specRows);
+}
+
+// ---------------------------------------------------------------- handlers
+
+function handleSearch(parsed: ParsedQuery, origin: Origin, context: AssistantContext): Draft {
+  const toolCalls: string[] = [];
+  let params = paramsFrom(parsed);
+  let result = searchProducts(params, origin);
+  toolCalls.push("search_products");
+  const relaxedNotes: string[] = [];
+  // Broaden step by step instead of answering «nothing found» while a wider
+  // query in the same intent would have worked.
+  if (result.items.length === 0 && params.max_price) {
+    relaxedNotes.push("بودجه را کمی باز کردم");
+    params = { ...params, max_price: undefined };
+    result = searchProducts(params, origin);
+    toolCalls.push("search_products(relaxed_budget)");
+  }
+  if (result.items.length === 0 && params.q) {
+    relaxedNotes.push("جست‌وجوی متنی را برداشتم و فقط دسته را نگه داشتم");
+    params = { ...params, q: undefined };
+    result = searchProducts(params, origin);
+    toolCalls.push("search_products(relaxed_text)");
+  }
+  if (result.items.length === 0 && params.brand) {
+    relaxedNotes.push("برند را برداشتم");
+    params = { ...params, brand: undefined };
+    result = searchProducts(params, origin);
+    toolCalls.push("search_products(relaxed_brand)");
+  }
+
+  const items = result.items;
+  const contextOut: AssistantContext = {
+    ...context,
+    category: parsed.category ?? context.category,
+    query: parsed.q ?? undefined,
+    product_id: items[0]?.product_id ?? context.product_id,
+    product_title: items[0]?.title ?? context.product_title,
+  };
+
+  if (items.length === 0) {
+    return {
+      reply: parsed.q
+        ? `برای «${parsed.q}» چیزی پیدا نکردم. اگر برند یا مشخصات را ساده‌تر بنویسید، دوباره می‌گردم.`
+        : "در این فیلترها کالایی پیدا نشد. محدودهٔ قیمت یا دسته را کمی باز کنید.",
+      blocks: [
+        {
+          type: "note",
+          title: "نتیجه‌ای نبود",
+          body: "می‌توانید بودجه را بالاتر ببرید، دسته را عوض کنید یا نام برند را حذف کنید.",
+          tone: "warn",
+        },
+      ],
+      suggestions: suggestionsFor(parsed),
+      context: contextOut,
+      intent: parsed.intent,
+      toolCalls,
+      parsed: parsed.debug,
+    };
+  }
+
+  const cheapest = items
+    .map((p) => p.min_price)
+    .filter((p): p is number => p !== null)
+    .sort((a, b) => a - b)[0];
+  const ages = items
+    .map((p) => p.best?.age_days)
+    .filter((a): a is number => a !== null)
+    .sort((a, b) => a - b);
+  const freshest = ages[0];
+
+  const blocks: Block[] = [
+    {
+      type: "products",
+      title: searchTitle(parsed),
+      subtitle: `${fa(result.total)} کالا در دیتاست؛ ${fa(items.length)} پیشنهاد برای شما`,
+      products: items,
+      layout: parsed.limit <= 3 ? "list" : "grid",
+    },
+  ];
+
+  if (parsed.category || parsed.brand || parsed.max_price) {
+    blocks.push({
+      type: "filters",
+      title: "فیلترها",
+      active: {
+        q: parsed.q,
+        category: parsed.category,
+        brand: parsed.brand,
+        neighborhood: parsed.neighborhood,
+        max_price: parsed.max_price,
+        max_age_days: null,
+        min_offers: null,
+        sort: parsed.sort,
+      },
+      options: {
+        categories: getMeta().categories.slice(0, 10).map((c) => c.name),
+        neighborhoods: getMeta().neighborhoods.slice(0, 12).map((n) => n.name),
+        brands: getMeta().brands.slice(0, 10),
+      },
+    });
+  }
+
+  if (items[0] && (parsed.limit <= 2 || parsed.intent === "offers")) {
+    const detail = getProduct(items[0].product_id, origin);
+    toolCalls.push("get_product");
+    if (detail) {
+      blocks.push(offersBlock(detail));
+      blocks.push(insightFor(detail));
+      contextOut.product_id = detail.product_id;
+      contextOut.product_title = detail.title;
+    }
+  }
+
+  const relaxedNote = relaxedNotes.length > 0 ? ` چون نتیجه‌ای نبود، ${relaxedNotes.join(" و ")}.` : "";
+  const parts = [
+    `${fa(items.length)} گزینه پیدا شد.`,
+    cheapest !== undefined ? `ارزان‌ترین از ${toman(cheapest)} شروع می‌شود.` : "",
+    freshest !== undefined ? `تازه‌ترین قیمت ${ageLabel(freshest)} ثبت شده است.` : "",
+  ].filter(Boolean);
+
+  return {
+    reply: parts.join(" ") + relaxedNote,
+    blocks,
+    suggestions: suggestionsFor(parsed, items[0] ? getProduct(items[0].product_id, origin) : null),
+    context: contextOut,
+    intent: parsed.intent === "offers" ? "offers" : "search",
+    toolCalls,
+    parsed: parsed.debug,
+  };
+}
+
+function handleOffers(
+  parsed: ParsedQuery,
+  origin: Origin,
+  context: AssistantContext,
+): Draft {
+  const toolCalls: string[] = ["get_product"];
+  // «قیمت این» refers to the open product; a named product starts a new subject.
+  const namesNewSubject = Boolean(parsed.q || parsed.brand || parsed.category);
+  let product = !namesNewSubject && context.product_id
+    ? getProduct(context.product_id, origin)
+    : null;
+  if (!product) {
+    const search = searchProducts(paramsFrom(parsed, { page_size: 3 }), origin);
+    toolCalls.push("search_products");
+    const first = search.items.find((p) => p.offer_count > 0);
+    product = first ? getProduct(first.product_id, origin) : null;
+  }
+  if (!product) {
+    return {
+      reply: "کالای مشخصی برای بررسی قیمت پیدا نکردم. نام کالا را کامل‌تر بنویسید.",
+      blocks: [
+        { type: "note", title: "کالا مشخص نیست", body: "مثلاً بنویسید «قیمت هدفون سونی WH-1000XM4».", tone: "info" },
+      ],
+      suggestions: ["هدفون زیر ۵ میلیون"],
+      context,
+      intent: parsed.intent,
+      toolCalls,
+      parsed: parsed.debug,
+    };
+  }
+
+  const best = product.offers[0];
+  const blocks: Block[] = [offersBlock(product), insightFor(product)];
+  if (best) {
+    blocks.push({
+      type: "reliability",
+      title: "این قیمت چقدر قابل اتکاست؟",
+      offer: best,
+      product_id: product.product_id,
+      product_title: product.title,
+    });
+  }
+  const stores = product.offers
+    .slice(0, 4)
+    .map((offer) => storeFromOffer(offer));
+  if (stores.length > 0) {
+    blocks.push(mapBlock("فروشگاه‌های این کالا", stores, origin));
+  }
+  const spread = product.market.spread_percent;
+  const reply = best
+    ? `کمترین قیمت ${toman(best.price)} در «${best.shop.name}» است؛ ${best.freshness_label} (${ageLabel(best.age_days)}).${
+        spread !== null && spread > 40
+          ? ` اختلاف ارزان‌ترین و گران‌ترین فروشنده ${fa(spread)}٪ است، پس مقایسه به‌صرفه است.`
+          : ""
+      }`
+    : "برای این کالا قیمتی ثبت نشده است.";
+
+  return {
+    reply,
+    blocks,
+    suggestions: suggestionsFor(parsed, product),
+    context: {
+      ...context,
+      product_id: product.product_id,
+      product_title: product.title,
+      category: product.category,
+      query: parsed.q ?? undefined,
+    },
+    intent: "offers",
+    toolCalls,
+    parsed: parsed.debug,
+  };
+}
+
+function storeFromOffer(offer: OfferView): StoreCard {
+  return {
+    shop_id: offer.shop.shop_id,
+    name: offer.shop.name,
+    neighborhood: offer.shop.neighborhood,
+    address: offer.shop.address,
+    lat: offer.shop.lat,
+    lon: offer.shop.lon,
+    phone: offer.shop.phone,
+    distance_m: offer.shop.distance_m,
+    categories: [],
+    website: null,
+    instagram: null,
+    fast_delivery: false,
+    offer_count: 0,
+    hours_today: null,
+    open_now: null,
+  };
+}
+
+function handleCompare(parsed: ParsedQuery, origin: Origin, context: AssistantContext): Draft {
+  const toolCalls: string[] = [];
+  let products: ProductDetail[] = [];
+  if (context.product_id) {
+    const current = getProduct(context.product_id, origin);
+    toolCalls.push("get_product");
+    if (current) {
+      products.push(current);
+      const alternative = current.alternatives[0];
+      if (alternative) {
+        const alt = getProduct(alternative.product_id, origin);
+        if (alt) products.push(alt);
+      }
+    }
+  }
+  if (products.length < 2) {
+    const search = searchProducts(paramsFrom(parsed, { page_size: 3, sort: parsed.sort ?? "offers" }), origin);
+    toolCalls.push("search_products");
+    const candidateIds = search.items
+      .filter((p) => p.offer_count > 0)
+      .slice(0, 3)
+      .map((p) => p.product_id);
+    products = candidateIds
+      .map((id) => getProduct(id, origin))
+      .filter((p): p is ProductDetail => p !== null);
+  }
+  if (products.length < 2) {
+    return {
+      reply: "برای مقایسه دست‌کم دو کالا لازم است. نام دو مدل را بنویسید یا از صفحهٔ کالا مقایسه را شروع کنید.",
+      blocks: [
+        {
+          type: "note",
+          title: "مقایسه ناتمام",
+          body: "مثلاً «هدفون سونی و هدفون پاناسونیک را مقایسه کن».",
+          tone: "info",
+        },
+      ],
+      suggestions: ["هدفون سونی زیر ۵ میلیون"],
+      context,
+      intent: "compare",
+      toolCalls,
+      parsed: parsed.debug,
+    };
+  }
+
+  const columns = compareColumns(products.map((p) => p.product_id), origin);
+  const cheapestIndex = columns.reduce(
+    (best, c, i) =>
+      c.price !== null && (columns[best]?.price === null || c.price < (columns[best]?.price ?? Infinity))
+        ? i
+        : best,
+    0,
+  );
+  const rows = comparisonRows(products, origin);
+
+  return {
+    reply: `این ${fa(columns.length)} گزینه را از نظر قیمت، تازگی اطلاعات و فروشنده مقایسه کردم. ارزان‌ترین «${columns[cheapestIndex]?.title}» است؛ اما پیش از انتخاب، ستون تازگی قیمت را هم ببینید.`,
+    blocks: [
+      {
+        type: "compare",
+        title: "مقایسهٔ رو در رو",
+        subtitle: "ستون روشن‌تر، انتخاب پیشنهادی است.",
+        columns,
+        rows,
+        note: "قیمت‌ها کمترین پیشنهاد ثبت‌شده برای هر کالاست؛ هزینهٔ رفت‌وآمد را جدا حساب کنید.",
+      },
+      {
+        type: "products",
+        title: "گزینه‌های حاضر در مقایسه",
+        products: products.map((p) => ({
+          product_id: p.product_id,
+          title: p.title,
+          brand: p.brand,
+          category: p.category,
+          image: p.image,
+          min_price: p.min_price,
+          max_price: p.max_price,
+          offer_count: p.offer_count,
+          best: p.best,
+          newest_at: p.newest_at,
+          freshness: p.freshness,
+        })),
+        layout: "list",
+      },
+    ],
+    suggestions: ["برنامهٔ خرید بچین", "ارزان‌ترین گزینه‌ها را نشان بده", "فروشگاه‌های نزدیک را ببین"],
+    context: {
+      ...context,
+      product_id: products[0]?.product_id,
+      product_title: products[0]?.title,
+      category: products[0]?.category,
+    },
+    intent: "compare",
+    toolCalls,
+    parsed: parsed.debug,
+  };
+}
+
+function handleStores(parsed: ParsedQuery, origin: Origin, context: AssistantContext): Draft {
+  const toolCalls: string[] = [];
+  let stores: StoreCard[] = [];
+  if (parsed.category || parsed.brand) {
+    stores = getStoresSelling({
+      category: parsed.category ?? undefined,
+      brand: parsed.brand ?? undefined,
+      origin,
+      radiusM: 6000,
+      limit: 8,
+    });
+    toolCalls.push("get_stores_selling");
+  }
+  if (stores.length === 0) {
+    const result = searchShops(
+      {
+        q: parsed.q ?? undefined,
+        category: parsed.category ?? undefined,
+        neighborhood: parsed.neighborhood ?? undefined,
+        sort: "distance",
+        page_size: 8,
+        lat: origin.lat,
+        lon: origin.lon,
+        radius_m: 8000,
+      },
+      origin,
+    );
+    toolCalls.push("search_shops");
+    stores = result.items;
+  }
+
+  if (stores.length === 0) {
+    return {
+      reply: "فروشگاهی نزدیک این نقطه پیدا نشد. محله را عوض کنید یا شعاع را بیشتر بگیرید.",
+      blocks: [
+        {
+          type: "note",
+          title: "فروشگاهی در نزدیکی نیست",
+          body: "می‌توانید محلهٔ دیگری را انتخاب کنید یا در فهرست فروشگاه‌ها همهٔ تهران را ببینید.",
+          tone: "warn",
+        },
+      ],
+      suggestions: ["فروشگاه‌های فردوسی", "همهٔ فروشگاه‌ها"],
+      context,
+      intent: "stores",
+      toolCalls,
+      parsed: parsed.debug,
+    };
+  }
+
+  const closest = stores[0]!;
+  const subject = parsed.category ?? parsed.brand ?? parsed.q ?? "این دسته";
+  return {
+    reply: `${fa(stores.length)} فروشگاه برای ${subject} در اطراف نقطهٔ شما پیدا شد. نزدیک‌ترین «${closest.name}» در ${distanceLabel(closest.distance_m)} است${closest.phone ? `؛ تماس: ${fa(closest.phone)}` : ""}.`,
+    blocks: [
+      {
+        type: "stores",
+        title: `فروشگاه‌های ${subject}`,
+        subtitle: "مرتب‌شده از نزدیک‌ترین به نقطهٔ شروع",
+        stores,
+        origin,
+      },
+      mapBlock("روی نقشه", stores, origin),
+    ],
+    suggestions: ["برنامهٔ خرید بچین", "قیمت‌ها را مقایسه کن", "فروشگاه‌های نزدیک‌تر"],
+    context: {
+      origin: context.origin,
+      category: parsed.category ?? context.category,
+      query: parsed.q ?? undefined,
+    },
+    intent: "stores",
+    toolCalls,
+    parsed: parsed.debug,
+  };
+}
+
+function handlePlan(
+  parsed: ParsedQuery,
+  origin: Origin,
+  context: AssistantContext,
+): Draft {
+  const toolCalls: string[] = [];
+  let offerIds = context.offer_ids ?? [];
+  let autoBuilt = false;
+  if (offerIds.length === 0) {
+    const search = searchProducts(paramsFrom(parsed, { page_size: 3 }), origin);
+    toolCalls.push("search_products");
+    for (const item of search.items.slice(0, 3)) {
+      const detail = getProduct(item.product_id, origin);
+      if (detail?.offers[0]) offerIds.push(detail.offers[0].offer_id);
+    }
+    toolCalls.push("get_product");
+    autoBuilt = offerIds.length > 0;
+  }
+  const plan = buildPlan(offerIds, origin);
+  if (!plan) {
+    return {
+      reply: "برای ساختن برنامه، دست‌کم یک کالا به سبد اضافه کنید یا بگویید چه می‌خواهید بخرید.",
+      blocks: [
+        {
+          type: "note",
+          title: "سبد خالی است",
+          body: "از کارت هر کالا «افزودن به برنامه» را بزنید، بعد دوباره از من برنامه بخواهید.",
+          tone: "info",
+        },
+      ],
+      suggestions: ["هدفون زیر ۵ میلیون", "برنامهٔ خرید بچین"],
+      context,
+      intent: "plan",
+      toolCalls,
+      parsed: parsed.debug,
+    };
+  }
+
+  toolCalls.push("build_plan");
+  const note = autoBuilt
+    ? "این برنامه را از سه گزینهٔ اول همین جست‌وجو ساختم؛ می‌توانید هر قلم را عوض کنید یا از سبد خودتان برنامه بگیرید."
+    : null;
+
+  return {
+    reply: `${planSummary(plan)} ${plan.warnings[0] ?? ""}`.trim(),
+    blocks: [
+      { type: "plan", title: "برنامهٔ خرید حضوری", plan },
+      mapBlock(
+        "مسیر پیشنهادی",
+        plan.stops.map((stop) => ({
+          shop_id: stop.shop.shop_id,
+          name: stop.shop.name,
+          neighborhood: stop.shop.neighborhood,
+          address: stop.shop.address,
+          lat: stop.shop.lat,
+          lon: stop.shop.lon,
+          phone: stop.shop.phone,
+          distance_m: stop.shop.distance_m,
+          categories: [],
+          website: null,
+          instagram: null,
+          fast_delivery: false,
+          offer_count: 0,
+          hours_today: null,
+          open_now: null,
+        })),
+        origin,
+        plan.stops.map((s) => s.shop.shop_id),
+      ),
+      ...(note ? [{ type: "note" as const, body: note, tone: "info" as const }] : []),
+    ],
+    suggestions: ["این برنامه را در سبد نگه دار", "گزینهٔ ارزان‌تر جایگزین کن", "فروشگاه‌های نزدیک‌تر"],
+    context: { ...context, offer_ids: plan.stops.flatMap((s) => s.items.map((i) => i.offer_id)) },
+    intent: "plan",
+    toolCalls,
+    parsed: parsed.debug,
+  };
+}
+
+function handleAlternatives(
+  parsed: ParsedQuery,
+  origin: Origin,
+  context: AssistantContext,
+): Draft {
+  const toolCalls: string[] = [];
+  let product = context.product_id ? getProduct(context.product_id, origin) : null;
+  if (!product) {
+    toolCalls.push("search_products");
+    const search = searchProducts(paramsFrom(parsed, { page_size: 2 }), origin);
+    const first = search.items[0];
+    if (first) product = getProduct(first.product_id, origin);
+  }
+  if (!product) {
+    return {
+      reply: "کالای مرجعی پیدا نکردم. اول یک کالا را باز کنید یا نامش را بنویسید.",
+      blocks: [],
+      suggestions: suggestionsFor(parsed),
+      context,
+      intent: "alternatives",
+      toolCalls,
+      parsed: parsed.debug,
+    };
+  }
+  toolCalls.push("get_product");
+  if (product.alternatives.length === 0) {
+    return {
+      reply: "برای این کالا جایگزین نزدیکی در همان دسته و بازهٔ قیمت پیدا نشد.",
+      blocks: [
+        {
+          type: "note",
+          title: "جایگزینی نیست",
+          body: "می‌توانید بازهٔ قیمت را بازتر کنید یا دستهٔ دیگری را ببینید.",
+          tone: "warn",
+        },
+      ],
+      suggestions: ["نزدیک‌ترین فروشگاه این کالا کجاست؟"],
+      context: { ...context, product_id: product.product_id },
+      intent: "alternatives",
+      toolCalls,
+      parsed: parsed.debug,
+    };
+  }
+  const cheaper = product.alternatives.filter(
+    (a) => a.min_price !== null && product?.min_price !== null && a.min_price < (product.min_price ?? 0),
+  );
+  return {
+    reply: `${fa(product.alternatives.length)} جایگزین در همان دسته پیدا کردم${
+      cheaper.length > 0
+        ? `؛ ${fa(cheaper.length)} مورد از «${product.title.slice(0, 40)}» ارزان‌تر است.`
+        : "؛ هیچ‌کدام ارزان‌تر نیست، اما تازگی قیمت‌ها فرق دارد."
+    }`,
+    blocks: [
+      {
+        type: "products",
+        title: "جایگزین‌های نزدیک",
+        subtitle: "همان دسته، بازهٔ قیمت نزدیک به کالای فعلی",
+        products: product.alternatives,
+        layout: "grid",
+      },
+    ],
+    suggestions: suggestionsFor(parsed, product),
+    context: { ...context, product_id: product.product_id, product_title: product.title },
+    intent: "alternatives",
+    toolCalls,
+    parsed: parsed.debug,
+  };
+}
+
+function handleFreshness(
+  parsed: ParsedQuery,
+  origin: Origin,
+  context: AssistantContext,
+): Draft {
+  const offersDraft = handleOffers(parsed, origin, context);
+  const freshnessNote: Block = {
+    type: "note",
+    title: "چطور تازگی را می‌خوانم",
+    body: "کمتر از ۷ روز تازه، تا ۳۰ روز قابل اتکا و بیشتر از ۹۰ روز کهنه حساب می‌شود. برای خرید حضوری، قیمت‌های کهنه را قبل از رفتن تلفنی تأیید کنید.",
+    tone: "info",
+  };
+  return {
+    ...offersDraft,
+    blocks: [...offersDraft.blocks, freshnessNote],
+    intent: "freshness",
+  };
+}
+
+function handleGreeting(origin: Origin): Draft {
+  const meta = getMeta();
+  return {
+    reply:
+      "سلام! من دستیار خرید حضوری هم‌خریدم. بگویید چه می‌خواهید بخرید، چه بودجه‌ای دارید یا کدام محله را ترجیح می‌دهید؛ قیمت‌های واقعی فروشگاه‌های تهران را مقایسه می‌کنم و برنامهٔ یک خرید مطمئن می‌چینم.",
+    blocks: [
+      {
+        type: "insight",
+        title: "آنچه در دسترس دارم",
+        items: [
+          { label: "کالای indexed", value: `${faNumber(meta.counts.products)} کالا`, tone: "neutral" },
+          { label: "پیشنهاد قیمت", value: `${faNumber(meta.counts.offers)} مورد`, tone: "neutral" },
+          { label: "فروشگاه", value: `${faNumber(meta.counts.shops)} فروشگاه`, tone: "neutral" },
+          {
+            label: "قابل مقایسه",
+            value: `${faNumber(meta.counts.comparable_products)} کالا`,
+            hint: "بیش از یک فروشنده",
+            tone: "good",
+          },
+        ],
+      },
+      {
+        type: "note",
+        title: "یک نمونه",
+        body: "بنویسید «هدفون بی‌سیم زیر ۵ میلیون» یا «نزدیک‌ترین فروشگاه دوربین مدار بسته در فردوسی».",
+        tone: "info",
+      },
+    ],
+    suggestions: [
+      "هدفون بی‌سیم زیر ۵ میلیون",
+      "گوشی سامسونگ تا ۲۰ میلیون",
+      "نزدیک‌ترین فروشگاه دوربین مدار بسته",
+      "برنامهٔ خرید بچین",
+    ],
+    context: { origin },
+    intent: "greeting",
+    toolCalls: [],
+    parsed: {},
+  };
+}
+
+function handleHelp(origin: Origin): Draft {
+  return {
+    reply:
+      "چهار کار برایتان می‌کنم: پیدا کردن کالا با بودجه و دسته، مقایسهٔ قیمت فروشگاه‌ها، سنجش تازگی و اتکای هر قیمت، و چیدن یک برنامهٔ حضوری که فقط ایست‌های نزدیک هم را دارد. هر زمان بگویید «نزدیک من» تا فاصله‌ها از محله‌تان حساب شود.",
+    blocks: [
+      {
+        type: "note",
+        title: "مثال‌های کاربردی",
+        body: "«مبل تخت‌خوابشو زیر ۳۰ میلیون»، «قیمت گوشی سامسونگ تازه است؟»، «مقایسهٔ دو هدفون»، «برنامهٔ خرید با این سه کالا».",
+        tone: "info",
+      },
+    ],
+    suggestions: [
+      "هدفون زیر ۵ میلیون",
+      "قیمت‌ها را از نظر تازگی بررسی کن",
+      "نزدیک‌ترین فروشگاه به من",
+      "برنامهٔ خرید بچین",
+    ],
+    context: { origin },
+    intent: "help",
+    toolCalls: [],
+    parsed: {},
+  };
+}
+
+// ------------------------------------------------------------------ entry
+
+export async function respond(request: AssistantRequest): Promise<AssistantResponse> {
+  const started = performance.now();
+  const meta = getMeta();
+  const origin: Origin = request.context?.origin ?? meta.default_origin;
+  const context: AssistantContext = request.context ?? {};
+  const parsed = parseMessage(
+    request.message,
+    {
+      categories: allCategoryNames(),
+      brands: allBrandNames(),
+      neighborhoods: meta.neighborhoods.map((n) => n.name),
+    },
+    context,
+  );
+
+  let draft: Draft;
+  switch (parsed.intent) {
+    case "greeting":
+      draft = handleGreeting(origin);
+      break;
+    case "help":
+      draft = handleHelp(origin);
+      break;
+    case "offers":
+      draft = handleOffers(parsed, origin, context);
+      break;
+    case "compare":
+      draft = handleCompare(parsed, origin, context);
+      break;
+    case "stores":
+      draft = handleStores(parsed, origin, context);
+      break;
+    case "plan":
+      draft = handlePlan(parsed, origin, context);
+      break;
+    case "alternatives":
+      draft = handleAlternatives(parsed, origin, context);
+      break;
+    case "freshness":
+      draft = handleFreshness(parsed, origin, context);
+      break;
+    case "unknown":
+      draft = {
+        reply:
+          "برای اینکه درست کمک کنم، بگویید چه چیزی می‌خواهید بخرید؛ مثلاً «هدفون زیر ۵ میلیون» یا «نزدیک‌ترین فروشگاه مبل». اگر کالایی را باز کرده‌اید، همان را نام ببرید.",
+        blocks: [
+          {
+            type: "note",
+            title: "دقیق‌تر بگویید",
+            body: "دسته، بودجه یا محله را کنار نام کالا بنویسید تا نتیجهٔ دقیق‌تری بگیرید.",
+            tone: "info",
+          },
+        ],
+        suggestions: [
+          "هدفون بی‌سیم زیر ۵ میلیون",
+          "گوشی سامسونگ تا ۲۰ میلیون",
+          "نزدیک‌ترین فروشگاه دوربین مدار بسته",
+          "برنامهٔ خرید بچین",
+        ],
+        context,
+        intent: "unknown",
+        toolCalls: [],
+        parsed: parsed.debug,
+      };
+      break;
+    default:
+      draft = handleSearch(parsed, origin, context);
+  }
+
+  return {
+    reply: draft.reply,
+    blocks: draft.blocks,
+    suggestions: draft.suggestions,
+    context: { ...draft.context, origin },
+    meta: {
+      engine: "rules",
+      ms: Math.round(performance.now() - started),
+      intent: draft.intent,
+      tool_calls: draft.toolCalls,
+      parsed: draft.parsed,
+    },
+  };
+}
+
+/** Exported for tests. */
+export const __internal = { comparisonRows, offersByPrice, searchTitle };
