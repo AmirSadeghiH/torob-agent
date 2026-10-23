@@ -8,6 +8,7 @@ import type {
 } from "../shared/types";
 import { dbHealth, getMeta, getOffer, getProduct, getShop, searchProducts, searchShops } from "./repo";
 import { buildPlan } from "./plan";
+import { dbMissingMessage } from "./db";
 import { RouteError, buildRoute, isTravelMode } from "./routing";
 import { respond } from "./assistant";
 import { normalizeHistory } from "./ai-config";
@@ -240,6 +241,16 @@ export function apiErrorHandler(
 ): void {
   if (error instanceof BadRequest) {
     res.status(400).json({ error: error.message });
+    return;
+  }
+  if (error instanceof RouteError) {
+    res.status(error.status).json({ error: error.message });
+    return;
+  }
+  if (error instanceof Error && error.message === dbMissingMessage()) {
+    res.status(503).json({
+      error: "داده هنوز ایمپورت نشده است. اول `npm run data:import` را اجرا کنید.",
+    });
     return;
   }
   console.error("[api]", error);

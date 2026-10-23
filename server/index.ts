@@ -3,7 +3,7 @@ import express from "express";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { api, apiErrorHandler } from "./api";
-import { dbPath } from "./db";
+import { dbPath, dbReady } from "./db";
 
 const app = express();
 const port = Number(process.env.PORT) || 8787;
@@ -48,7 +48,13 @@ if (isProduction) {
 }
 
 app.listen(port, "0.0.0.0", () => {
-  console.log(`ترب‌یار روی پورت ${port} اجرا شد`);
+  console.log(`ترب‌یار API روی http://0.0.0.0:${port} — داده: ${path.basename(dbPath)}`);
+  if (!dbReady()) {
+    console.warn(
+      `[db] ${path.basename(dbPath)} پیدا نشد. سرویس بالا است، اما جست‌وجوها تا ایمپورت داده معتبر نخواهند بود.`,
+    );
+    console.warn("[db] برای فعال‌سازی: npm run data:import");
+  }
   if (!isProduction) {
     console.log("حالت توسعه: رابط کاربری جداگانه روی Vite اجرا می‌شود.");
   }

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, describe, test } from "node:test";
+import { existsSync, statSync } from "node:fs";
+import path from "node:path";
 import {
   NeshanError,
   clearNeshanCache,
@@ -18,6 +20,14 @@ import { shopsByIds } from "../repo";
 
 const KEY = "test-key-not-real";
 const GOOGLE_POLYLINE = "_p~iF~ps|U_ulLnnqC_mqNvxq`@";
+
+/** Subtests that read real shop records skip when the dataset is not imported. */
+const dbFile = process.env.HAMKHARID_DB
+  ? path.resolve(process.env.HAMKHARID_DB)
+  : path.resolve(process.cwd(), "data", "hamkharid.db");
+const skipDb = existsSync(dbFile) && statSync(dbFile).size > 0
+  ? false
+  : "data/hamkharid.db is not imported (run npm run data:import)";
 const ORIGIN = { lat: 35.7008, lon: 51.4035, label: "فردوسی" };
 
 const SHOP_IDS = [
@@ -264,7 +274,7 @@ describe("Neshan trip optimization", () => {
 });
 
 describe("buildRoute over dataset shops", () => {
-  test("builds a TSP-ordered route with real legs, geometry and excluded ids", async () => {
+  test("builds a TSP-ordered route with real legs, geometry and excluded ids", { skip: skipDb }, async () => {
     mockFetch((url) => {
       if (url.pathname === "/v3/trip") {
         return json({
@@ -312,7 +322,7 @@ describe("buildRoute over dataset shops", () => {
     );
   });
 
-  test("falls back to nearest-neighbour order when TSP is unavailable", async () => {
+  test("falls back to nearest-neighbour order when TSP is unavailable", { skip: skipDb }, async () => {
     mockFetch((url) => {
       if (url.pathname === "/v3/trip") return json({ error: "483", status: "ApiKeyTypeError" }, 483);
       return json(directionBody(3));
@@ -330,7 +340,7 @@ describe("buildRoute over dataset shops", () => {
     assert.equal(calls.filter((call) => call.url.pathname === "/v4/direction").length, 1);
   });
 
-  test("walking routes never use the vehicle optimizer", async () => {
+  test("walking routes never use the vehicle optimizer", { skip: skipDb }, async () => {
     mockFetch(() => json(directionBody(3)));
     const route = await buildRoute({
       shop_ids: SHOP_IDS,
@@ -343,7 +353,7 @@ describe("buildRoute over dataset shops", () => {
     assert.equal(calls[0].url.searchParams.get("type"), "pedestrian");
   });
 
-  test("return-to-origin adds the closing leg and routes back to the start", async () => {
+  test("return-to-origin adds the closing leg and routes back to the start", { skip: skipDb }, async () => {
     mockFetch((url) => {
       if (url.pathname === "/v3/trip") {
         return json({
@@ -398,7 +408,7 @@ describe("buildRoute over dataset shops", () => {
     assert.equal(calls.length, 0);
   });
 
-  test("provider failures surface as RouteError and never as geometry", async () => {
+  test("provider failures surface as RouteError and never as geometry", { skip: skipDb }, async () => {
     mockFetch((url) => {
       if (url.pathname === "/v3/trip") return json({ error: "483" }, 483);
       return json({ error: "481", status: "LimitExceeded" }, 481);
@@ -430,7 +440,7 @@ describe("buildRoute over dataset shops", () => {
     );
   });
 
-  test("caps the number of stops and reports the ones dropped", async () => {
+  test("caps the number of stops and reports the ones dropped", { skip: skipDb }, async () => {
     const ids = shopsByIds(SHOP_IDS).shops.map((shop) => shop.shop_id);
     const extras = [
       "shop_3f93a30a9e66c6dece07cdff",

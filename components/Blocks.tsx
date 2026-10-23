@@ -6,7 +6,7 @@ import {
   Info,
   SlidersHorizontal,
 } from "lucide-react";
-import type { Block } from "@/shared/types";
+import type { Block, InquiryStatus } from "@/shared/types";
 import { cn } from "@/lib/utils";
 import { fa, formatToman } from "@/lib/format";
 import { ProductCardView } from "@/components/ProductCardView";
@@ -15,6 +15,7 @@ import { StoreCardView } from "@/components/StoreCardView";
 import { ReliabilityView } from "@/components/ReliabilityView";
 import { TehranMap } from "@/components/TehranMap";
 import { PlanView } from "@/components/PlanView";
+import { SellerFollowupView, SellerInquiryView } from "@/components/SellerInquiryView";
 
 const SORT_LABEL: Record<string, string> = {
   price_asc: "ارزان‌ترین",
@@ -24,7 +25,15 @@ const SORT_LABEL: Record<string, string> = {
   relevance: "مرتبط‌ترین",
 };
 
-export function BlockView({ block }: { block: Block }) {
+export interface BlockInteraction {
+  /** Runs when a picker option is chosen (the option label is a real request). */
+  pick?: (label: string) => void;
+  /** Records a follow-up status the user reports on a seller inquiry. */
+  reportInquiry?: (status: InquiryStatus) => void;
+  inquiryStatus?: InquiryStatus | null;
+}
+
+export function BlockView({ block, interaction }: { block: Block; interaction?: BlockInteraction }) {
   switch (block.type) {
     case "products":
       return (
@@ -192,6 +201,24 @@ export function BlockView({ block }: { block: Block }) {
       );
     }
 
+    case "seller_inquiry":
+      return (
+        <SellerInquiryView
+          block={block}
+          reported={interaction?.inquiryStatus}
+          onReport={interaction?.reportInquiry}
+        />
+      );
+
+    case "seller_followup":
+      return <SellerFollowupView block={block} />;
+
+    case "preference_picker":
+      return <PreferencePickerBlock block={block} onPick={interaction?.pick} />;
+
+    case "decision_summary":
+      return <DecisionSummaryBlock block={block} />;
+
     default:
       return null;
   }
@@ -267,7 +294,11 @@ function FiltersBlock({ block }: { block: Extract<Block, { type: "filters" }> })
   if (active.category) chips.push({ label: "دسته", value: active.category });
   if (active.brand) chips.push({ label: "برند", value: active.brand });
   if (active.neighborhood) chips.push({ label: "محله", value: active.neighborhood });
+  if (active.min_price) chips.push({ label: "ارزان‌ترین از", value: formatToman(active.min_price) });
   if (active.max_price) chips.push({ label: "بودجه تا", value: formatToman(active.max_price) });
+  if (active.min_offers) chips.push({ label: "حداقل پیشنهاد", value: fa(active.min_offers) });
+  if (active.max_age_days) chips.push({ label: "حداکثر سن قیمت", value: `${fa(active.max_age_days)} روز` });
+  if (active.radius_m) chips.push({ label: "شعاب", value: `${fa(Math.round(active.radius_m / 100))}۰۰ متر` });
   if (active.sort) chips.push({ label: "ترتیب", value: SORT_LABEL[active.sort] ?? active.sort });
 
   const exploreHref = (patch: Record<string, string | number | null | undefined>) => {
@@ -278,6 +309,10 @@ function FiltersBlock({ block }: { block: Extract<Block, { type: "filters" }> })
       brand: active.brand,
       neighborhood: active.neighborhood,
       max_price: active.max_price,
+      min_price: active.min_price,
+      min_offers: active.min_offers,
+      max_age_days: active.max_age_days,
+      radius_m: active.radius_m,
       sort: active.sort,
       ...patch,
     };
@@ -353,6 +388,91 @@ function FiltersBlock({ block }: { block: Extract<Block, { type: "filters" }> })
           ))}
         </div>
       </div>
+    </section>
+  );
+}
+
+/**
+ * A question with concrete options. Picking one sends the option's label as a
+ * real request, so the picker never offers a control that does nothing.
+ */
+function PreferencePickerBlock({
+  block,
+  onPick,
+}: {
+  block: Extract<Block, { type: "preference_picker" }>;
+  onPick?: (label: string) => void;
+}) {
+  return (
+    <section className="flex flex-col gap-3 rounded-surface border-line border-border bg-card p-4 shadow-surface">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-2">
+        <h3 className="text-sm font-semibold">{block.title}</h3>
+        {block.subtitle && <p className="text-xs text-muted-foreground">{block.subtitle}</p>}
+      </div>
+      <p className="text-sm leading-7 text-foreground/80">{block.question}</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {block.options.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            onClick={() => onPick?.(option.label)}
+            className={cn(
+              "flex h-auto flex-col items-start gap-1 rounded-control border p-3 text-start transition-colors",
+              option.key === block.value
+                ? "border-brand bg-brand/5"
+                : "border-border bg-background hover:bg-accent",
+            )}
+          >
+            <span className="text-sm font-medium">{option.label}</span>
+            {option.description && (
+              <span className="text-xs text-muted-foreground">{option.description}</span>
+            )}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** A short, evidence-backed summary of a decision the user is about to make. */
+function DecisionSummaryBlock({ block }: { block: Extract<Block, { type: "decision_summary" }> }) {
+  return (
+    <section className="flex flex-col gap-3 rounded-surface border-line border-border bg-card p-4 shadow-surface">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-2">
+        <h3 className="text-sm font-semibold">{block.title}</h3>
+        {block.budget !== null && (
+          <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground">
+            بودجه تا {formatToman(block.budget)}
+          </span>
+        )}
+      </div>
+      <p className="text-sm font-medium">{block.product_title}</p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {block.reasons.map((reason) => (
+          <div key={reason.label} className="rounded-control border-line border-border bg-secondary/30 p-3">
+            <p className="text-xs text-muted-foreground">{reason.label}</p>
+            <p
+              className={cn(
+                "mt-1 text-sm font-semibold",
+                reason.tone === "good" && "text-success",
+                reason.tone === "warn" && "text-warning",
+                reason.tone === "bad" && "text-destructive",
+              )}
+            >
+              {reason.value}
+            </p>
+            {reason.hint && <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{reason.hint}</p>}
+          </div>
+        ))}
+      </div>
+      <p className="text-xs leading-6 text-muted-foreground">{block.next_step}</p>
+      {block.warnings && block.warnings.length > 0 && (
+        <ul className="flex flex-col gap-1 text-xs leading-6 text-warning">
+          {block.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

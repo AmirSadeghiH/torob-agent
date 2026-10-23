@@ -2,6 +2,7 @@ import type { AssistantRequest, AssistantResponse } from "../shared/types";
 import { respond as respondWithRules } from "./agent";
 import { runShoppingAgent, type AgentDeps } from "./ai-agent";
 import { agentConfigured, getAgentConfig } from "./ai-config";
+import { dbMissingMessage } from "./db";
 import { getMeta } from "./repo";
 
 /** Provider diagnostics without keys, payloads or stack traces. */
@@ -32,6 +33,33 @@ export async function respond(
   const config = deps.config ?? getAgentConfig();
   const origin = request.context?.origin ?? getMeta().default_origin;
   const llmAvailable = Boolean(deps.model) || agentConfigured(config);
+
+  // A fresh checkout has no data file yet. Answer honestly instead of letting
+  // the first query throw: the server stays up and says what is missing.
+  const missing = dbMissingMessage();
+  if (missing) {
+    return {
+      reply: "داده هنوز ایمپورت نشده است، بنابراین پاسخ درستی نمی‌دهم. اول `npm run data:import` را اجرا کنید.",
+      blocks: [
+        {
+          type: "note",
+          title: "داده آماده نیست",
+          body: "فایل دیتاست در این محیط ساخته نشده. بعد از ایمپورت، جست‌وجوهای واقعی، پیشنهادهای مرتبط و برنامهٔ خرید داده می‌شود.",
+          tone: "warn",
+        },
+      ],
+      suggestions: [],
+      context: request.context ?? {},
+      meta: {
+        engine: "rules",
+        ms: 0,
+        intent: "help",
+        tool_calls: [],
+        parsed: {},
+        model: null,
+      },
+    };
+  }
 
   if (llmAvailable) {
     try {

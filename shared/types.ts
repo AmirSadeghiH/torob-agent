@@ -14,6 +14,40 @@ export interface Origin {
 
 export type ShopIdentity = "registered" | "anonymized";
 
+/**
+ * Where a fact came from. Never inferred from a name, a category or the model.
+ * `unknown` means «we have no reliable source», not «the field is false».
+ */
+export type Provenance =
+  | "dataset"
+  | "seller_reported"
+  | "user_reported"
+  | "verified_integration"
+  | "unknown";
+
+/**
+ * Per-capability status. `unregistered` and `unknown` are deliberately kept
+ * apart from `unsupported`: a missing field must never read as «does not
+ * support it».
+ */
+export type CapabilityStatus = "recorded" | "unregistered" | "unsupported" | "unknown";
+
+export interface ShopCapability {
+  key:
+    | "tebpi"
+    | "installment"
+    | "invoice"
+    | "fast_delivery"
+    | "payments"
+    | "hours"
+    | "contact";
+  label: string;
+  status: CapabilityStatus;
+  source: Provenance;
+  /** One honest Persian sentence, e.g. «ارسال سریع: ثبت‌شده در دیتاست». */
+  detail: string;
+}
+
 export interface StoreRef {
   shop_id: string;
   name: string;
@@ -24,6 +58,8 @@ export interface StoreRef {
   lat: number | null;
   lon: number | null;
   distance_m: number | null;
+  website: string | null;
+  instagram: string | null;
 }
 
 export interface Spec {
@@ -73,6 +109,9 @@ export interface ProductBest {
   age_days: number | null;
   freshness: FreshnessLevel;
   distance_m: number | null;
+  /** Public contact channels registered in the dataset (never a phone number). */
+  website: string | null;
+  instagram: string | null;
 }
 
 export interface ProductCard {
@@ -112,6 +151,8 @@ export interface StoreCard extends StoreRef {
   offer_count: number;
   hours_today: DayHours | null;
   open_now: boolean | null;
+  /** Buying capabilities with explicit status and provenance, never guessed. */
+  capabilities: ShopCapability[];
   /** How many offers of the current query this shop has, when known. */
   matched_offers?: number;
 }
@@ -341,10 +382,55 @@ export interface AppliedFilters {
   category: string | null;
   brand: string | null;
   neighborhood: string | null;
+  min_price: number | null;
   max_price: number | null;
   max_age_days: number | null;
   min_offers: number | null;
   sort: SearchParams["sort"] | null;
+  radius_m: number | null;
+}
+
+/* ------------------------------------------------------- seller inquiry */
+
+/**
+ * Follow-up state for a prepared seller inquiry. The app never claims it
+ * called the seller or received an answer: opening a channel is not sending
+ * a message, and only `user_reported` states are user-entered.
+ */
+export type InquiryStatus =
+  | "ready"
+  | "opened"
+  | "awaiting"
+  | "stock_confirmed"
+  | "price_reported"
+  | "not_found"
+  | "no_response"
+  | "failed";
+
+export interface InquiryContact {
+  kind: "website" | "instagram";
+  label: string;
+  href: string;
+}
+
+export interface Inquiry {
+  id: string;
+  offer_id: string;
+  product_id: string;
+  product_title: string;
+  shop_id: string;
+  shop_name: string;
+  neighborhood: string | null;
+  price: number;
+  changed_at: string | null;
+  freshness: FreshnessLevel;
+  contacts: InquiryContact[];
+  message: string;
+  status: InquiryStatus;
+  note: string | null;
+  reported_price: number | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface InsightItem {
@@ -397,12 +483,16 @@ export type Block =
   | {
       type: "filters";
       title: string;
+      subtitle?: string;
       active: AppliedFilters;
       options: {
         categories: string[];
         neighborhoods: string[];
         brands: string[];
       };
+      origin: Origin | null;
+      /** Distance radius in metres, or null when the search is city-wide. */
+      radius_m: number | null;
     }
   | {
       type: "reliability";
@@ -413,6 +503,48 @@ export type Block =
     }
   | { type: "plan"; title: string; plan: Plan }
   | { type: "insight"; title: string; items: InsightItem[] }
+  | {
+      type: "seller_inquiry";
+      title: string;
+      subtitle?: string;
+      product_id: string;
+      product_title: string;
+      offer: OfferView;
+      contacts: InquiryContact[];
+      /** Server-built, user-editable draft. The user decides whether to send it. */
+      message: string;
+    }
+  | {
+      type: "seller_followup";
+      title: string;
+      subtitle?: string;
+      inquiry_id: string;
+      product_title: string;
+      shop_name: string;
+      price: number;
+      status: InquiryStatus;
+      note: string | null;
+      contacts: InquiryContact[];
+      message: string;
+    }
+  | {
+      type: "preference_picker";
+      title: string;
+      subtitle?: string;
+      question: string;
+      options: { key: string; label: string; description?: string }[];
+      value?: string;
+    }
+  | {
+      type: "decision_summary";
+      title: string;
+      product_title: string;
+      budget: number | null;
+      best_offer_id: string;
+      reasons: InsightItem[];
+      next_step: string;
+      warnings?: string[];
+    }
   | {
       type: "note";
       title?: string;
@@ -433,6 +565,7 @@ export type AssistantIntent =
   | "plan"
   | "freshness"
   | "alternatives"
+  | "inquiry"
   | "unknown";
 
 export interface AssistantContext {
@@ -442,12 +575,57 @@ export interface AssistantContext {
   query?: string;
   offer_ids?: string[];
   origin?: Origin;
+  /** Live purchase conditions carried by the interactive panel, so a follow-up
+   *  («همین رو ارزون‌تر») keeps the budget the user just moved on screen. */
+  budget?: { min?: number; max?: number } | null;
+  neighborhood?: string;
+  radius_m?: number;
+  sort?: SearchParams["sort"];
+  min_offers?: number;
+  max_age_days?: number;
+  /** A preference the user picked without writing it (budget, category, …). */
+  preference?: string;
+  /** Last inquiry the user reported on, so «پاسخ نداد» keeps its subject. */
+  inquiry_status?: InquiryStatus;
 }
 
 /** A bounded slice of the conversation so follow-ups keep their subject. */
 export interface AssistantHistoryTurn {
   role: "user" | "assistant";
   text: string;
+}
+
+/** Partial purchase conditions, mirroring the interactive panel's controls. */
+export interface FilterPatch {
+  q?: string | null;
+  category?: string | null;
+  brand?: string | null;
+  neighborhood?: string | null;
+  min_price?: number | null;
+  max_price?: number | null;
+  min_offers?: number | null;
+  max_age_days?: number | null;
+  sort?: SearchParams["sort"] | null;
+  radius_m?: number | null;
+}
+
+/**
+ * An action a suggestion can actually run. The client validates the action
+ * before it executes; a suggestion without a real action is never shown.
+ */
+export type NextStepAction =
+  | { type: "search"; patch?: FilterPatch; request: string }
+  | { type: "compare"; product_ids: string[]; request: string }
+  | { type: "inquiry"; offer_id?: string; product_id?: string; request: string }
+  | { type: "plan"; request: string }
+  | { type: "alternatives"; product_id: string; request: string }
+  | { type: "stores"; product_id?: string; shop_id?: string; category?: string; request: string }
+  | { type: "message"; text: string; request: string };
+
+/** A labelled, runnable next step produced from real tool results. */
+export interface NextStep {
+  label: string;
+  action: NextStepAction;
 }
 
 export interface AssistantRequest {
@@ -459,7 +637,7 @@ export interface AssistantRequest {
 export interface AssistantResponse {
   reply: string;
   blocks: Block[];
-  suggestions: string[];
+  suggestions: NextStep[];
   context: AssistantContext;
   meta: {
     /** `llm_agent` = the model chose and ran the tools; `rules_fallback` = deterministic engine answered. */

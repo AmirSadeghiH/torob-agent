@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Camera,
@@ -14,10 +14,22 @@ import {
   Wallet,
 } from "lucide-react";
 import { useAppMeta, useBasket, useChat, useOrigin } from "@/lib/app-state";
+import type { InquiryStatus, NextStep } from "@/shared/types";
 import { cn } from "@/lib/utils";
 import { fa, faNumber } from "@/lib/format";
 import { BlockView } from "@/components/Blocks";
 import { Skeleton } from "@/components/ui/skeleton";
+
+/** Follow-up status the user reported on a seller inquiry; never a Torobyar claim. */
+const INQUIRY_KEY = "hamkharid.inquiry.v1";
+const INQUIRY_STATUSES: InquiryStatus[] = [
+  "awaiting",
+  "no_response",
+  "stock_confirmed",
+  "not_found",
+  "price_reported",
+  "failed",
+];
 
 const PROMPTS = [
   {
@@ -74,10 +86,12 @@ function AssistantMessage({
   text,
   blocks,
   meta,
+  interaction,
 }: {
   text: string;
   blocks?: React.ComponentProps<typeof BlockView>["block"][];
   meta?: { engine: string; intent: string; ms: number };
+  interaction?: React.ComponentProps<typeof BlockView>["interaction"];
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -118,7 +132,11 @@ function AssistantMessage({
         {blocks && blocks.length > 0 && (
           <div className="mt-3 flex flex-col gap-5">
             {blocks.map((block, index) => (
-              <BlockView key={`${block.type}-${index}`} block={block} />
+              <BlockView
+                key={`${block.type}-${index}`}
+                block={block}
+                interaction={interaction}
+              />
             ))}
           </div>
         )}
@@ -167,7 +185,12 @@ export function ChatPage() {
   const { origin } = useOrigin();
   const basket = useBasket();
   const { messages, sending, error, send, retry, reset } = useChat();
+  const navigate = useNavigate();
   const [draft, setDraft] = useState("");
+  const [inquiryStatus, setInquiryStatus] = useState<InquiryStatus | null>(() => {
+    const raw = localStorage.getItem(INQUIRY_KEY);
+    return (INQUIRY_STATUSES as string[]).includes(raw ?? "") ? (raw as InquiryStatus) : null;
+  });
   const [params, setParams] = useSearchParams();
   const handledAsk = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -189,11 +212,43 @@ export function ChatPage() {
     const value = text.trim();
     if (!value || sending) return;
     setDraft("");
-    void send(value);
+    void send(value, inquiryStatus ? { inquiry_status: inquiryStatus } : undefined);
+  }
+
+  /**
+   * Runs a suggestion. Actions that own a page open it; the rest are handed to
+   * the assistant as the natural-language request the action carries, so a
+   * suggestion always does something real.
+   */
+  function runSuggestion(step: NextStep) {
+    if (sending) return;
+    const action = step.action;
+    if (action.type === "message") {
+      submit(action.text);
+      return;
+    }
+    if (action.type === "plan") {
+      void navigate("/plan");
+      return;
+    }
+    if (action.type === "stores") {
+      void navigate("/stores");
+      return;
+    }
+    submit(action.request);
   }
 
   const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
   const suggestions = lastAssistant?.suggestions ?? [];
+
+  const interaction = {
+    pick: (label: string) => submit(label),
+    reportInquiry: (status: InquiryStatus) => {
+      setInquiryStatus(status);
+      localStorage.setItem(INQUIRY_KEY, status);
+    },
+    inquiryStatus,
+  };
   const empty = messages.length === 0;
 
   return (
@@ -323,15 +378,15 @@ export function ChatPage() {
         <div className="flex flex-col gap-2">
           <p className="text-xs font-medium text-foreground">قدم بعدی</p>
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-            {suggestions.map((suggestion) => (
+            {suggestions.map((step) => (
               <button
-                key={suggestion}
+                key={step.label}
                 type="button"
-                onClick={() => submit(suggestion)}
+                onClick={() => runSuggestion(step)}
                 className="flex h-11 shrink-0 items-center gap-1.5 rounded-full border-line border-border bg-card px-3 text-xs shadow-control transition-colors hover:border-brand/40 hover:bg-accent"
               >
                 <Sparkles className="size-3.5 text-brand" strokeWidth={1.5} aria-hidden />
-                {suggestion}
+                {step.label}
               </button>
             ))}
           </div>

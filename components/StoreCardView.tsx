@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Clock, MapPin, Store } from "lucide-react";
 import type { StoreCard } from "@/shared/types";
 import { cn } from "@/lib/utils";
+import { CapabilityBadges } from "@/components/CapabilityBadges";
 import { distanceText, fa, openStateText } from "@/lib/format";
 
 interface StoreCardViewProps {
@@ -57,6 +58,8 @@ export function StoreCardView({ store, compact = false }: StoreCardViewProps) {
           ))}
         </div>
       )}
+
+      <CapabilityBadges capabilities={store.capabilities} />
 
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
         <p className="flex items-center gap-1 text-xs text-muted-foreground">
