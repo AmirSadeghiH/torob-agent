@@ -290,7 +290,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   text: string;
   blocks?: Block[];
-  suggestions?: string[];
+  suggestions?: AssistantResponse["suggestions"];
   meta?: AssistantResponse["meta"];
   failed?: boolean;
 }

@@ -7,6 +7,7 @@ import type {
   AssistantHistoryTurn,
   AssistantIntent,
   Block,
+  NextStep,
   Origin,
   ProductCard,
   ProductDetail,
@@ -36,6 +37,7 @@ import {
   type PlanArtifact,
   type ToolArtifact,
 } from "./ai-blocks";
+import { buildInquiryMessage, inquiryContacts } from "./inquiry";
 
 type AgentModel = NonNullable<Parameters<typeof createAgent>[0]["model"]>;
 
@@ -608,6 +610,108 @@ export const getShopDetailsTool = tool(
   },
 );
 
+const prepareInquirySchema = z.object({
+  offer_id: z
+    .string()
+    .trim()
+    .min(3)
+    .max(64)
+    .optional()
+    .describe("A real offer_id returned by another tool; preferred"),
+  product_id: z
+    .string()
+    .trim()
+    .min(3)
+    .max(64)
+    .optional()
+    .describe("Used only when offer_id is absent"),
+  shop_id: z
+    .string()
+    .trim()
+    .min(3)
+    .max(64)
+    .optional()
+    .describe("Preferred shop for the product, when several offers exist"),
+});
+
+/**
+ * Prepares a seller inquiry from a recorded offer. The server owns the offer
+ * data, the contact channels and the message draft; the model never writes
+ * price, product, shop or a phone number into the message.
+ */
+export const prepareSellerInquiryTool = tool(
+  async (input) => {
+    const origin = originForTools();
+    let offer = input.offer_id ? getOffer(input.offer_id, origin) : null;
+    if (!offer && input.product_id) {
+      const product = getProduct(input.product_id, origin);
+      if (!product) {
+        throw new Error("این product_id در دیتاست نیست؛ ابتدا کالا را با search_products پیدا کن.");
+      }
+      const wanted = input.shop_id
+        ? product.offers.find((entry) => entry.shop.shop_id === input.shop_id)
+        : product.offers[0];
+      if (!wanted) {
+        throw new Error(
+          "برای این کالا و این فروشگاه پیشنهاد ثبت‌شده‌ی معتبر پیدا نشد؛ shop_id یا offer_id دیگری را از خروجی ابزارها استفاده کن.",
+        );
+      }
+      offer = getOffer(wanted.offer_id, origin);
+    }
+    if (!offer) {
+      throw new Error(
+        "offer_id معتبر لازم است؛ فقط offer_idهایی را بفرست که در خروجی ابزارها آمده‌اند.",
+      );
+    }
+
+    const product = getProduct(offer.product_id, origin);
+    const productTitle = product?.title ?? offer.title ?? "کالای نامشخص";
+    const contacts = inquiryContacts({
+      website: offer.shop.website,
+      instagram: offer.shop.instagram,
+    });
+    const message = buildInquiryMessage({
+      productTitle,
+      shopName: offer.shop.name,
+      price: offer.price,
+      changedAt: offer.changed_at,
+      warranty: offer.warranty,
+    });
+    record("prepare_seller_inquiry", {
+      kind: "inquiry",
+      product_id: offer.product_id,
+      product_title: productTitle,
+      offer,
+      contacts,
+      message,
+    });
+
+    return JSON.stringify({
+      product_id: offer.product_id,
+      product_title: clip(productTitle, 120),
+      offer_id: offer.offer_id,
+      shop_id: offer.shop.shop_id,
+      shop_name: offer.shop.name,
+      price: offer.price,
+      changed_at: offer.changed_at,
+      age_days: offer.age_days,
+      freshness: offer.freshness,
+      contacts,
+      message,
+      note:
+        contacts.length > 0
+          ? "ترب‌یار پیام را آماده کرده؛ شما خودتان کانال را باز می‌کنید یا پیام را کپی می‌کنید. ترب‌یار مستقیم تماس نمی‌گیرد."
+          : "این فروشنده راه تماس ثبت‌شده‌ی معتبر (وب‌سایت یا اینستاگرام) ندارد. از فروشنده‌ی دیگری با راه تماس ثبت‌شده استفاده کن.",
+    });
+  },
+  {
+    name: "prepare_seller_inquiry",
+    description:
+      "Prepare a real seller inquiry (stock, final price, warranty, in-person conditions) for a recorded offer that has a registered contact channel. Pass a real offer_id from a previous tool result. Returns the offer, its public contact channels (never a phone number) and an editable Persian message draft. The user decides whether to open the channel or copy the message; the agent never sends anything.",
+    schema: prepareInquirySchema,
+  },
+);
+
 export const shoppingTools = [
   searchProductsTool,
   getProductDetailsTool,
@@ -616,6 +720,7 @@ export const shoppingTools = [
   findAlternativesTool,
   buildShoppingPlanTool,
   getShopDetailsTool,
+  prepareSellerInquiryTool,
 ] as const;
 
 /* ------------------------------------------------------------ system prompt */
@@ -714,7 +819,7 @@ export interface AgentRun {
   blocks: Block[];
   toolCalls: string[];
   context: AssistantContext;
-  suggestions: string[];
+  suggestions: NextStep[];
   intent: AssistantIntent;
   artifacts: ToolArtifact[];
   model: string;
@@ -760,7 +865,7 @@ export async function runShoppingAgent(input: AgentInput, deps: AgentDeps = {}):
     blocks: buildUiBlocks(artifacts, input.origin),
     toolCalls: [...new Set(collector.executed)],
     context: nextContext(context, artifacts),
-    suggestions: suggestionsFor(artifacts),
+    suggestions: suggestionsFor(artifacts, context),
     intent: intentFor(artifacts),
     artifacts,
     model: config.model,

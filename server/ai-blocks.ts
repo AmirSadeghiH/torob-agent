@@ -2,8 +2,11 @@ import type {
   AssistantContext,
   AssistantIntent,
   Block,
+  InquiryContact,
   MapPoint,
+  NextStep,
   Origin,
+  OfferView,
   Plan,
   ProductCard,
   ProductDetail,
@@ -16,6 +19,7 @@ import { comparisonRows } from "./agent";
 import { planSummary } from "./plan";
 import { distanceLabel } from "./lib/geo";
 import { ageLabel, fa, toman } from "./lib/text";
+import { contextualSuggestions, hasRecordedContact } from "./suggestions";
 
 /**
  * Typed, validated artifacts collected from the tools the model actually ran.
@@ -65,6 +69,15 @@ export interface ShopArtifact {
   shop: ShopDetail;
 }
 
+export interface InquiryArtifact {
+  kind: "inquiry";
+  product_id: string;
+  product_title: string;
+  offer: OfferView;
+  contacts: InquiryContact[];
+  message: string;
+}
+
 export type ToolArtifact =
   | SearchArtifact
   | ProductArtifact
@@ -72,11 +85,21 @@ export type ToolArtifact =
   | StoresArtifact
   | AlternativesArtifact
   | PlanArtifact
-  | ShopArtifact;
+  | ShopArtifact
+  | InquiryArtifact;
 
 export const MAX_UI_BLOCKS = 4;
 
-function mapPoints(stores: StoreCard[], order: string[]): MapPoint[] {
+type MapPointSource = {
+  shop_id: string;
+  name: string;
+  neighborhood: string | null;
+  lat: number | null;
+  lon: number | null;
+  distance_m: number | null;
+};
+
+function mapPoints(stores: MapPointSource[], order: string[]): MapPoint[] {
   return stores
     .filter((store) => store.lat !== null && store.lon !== null)
     .map((store) => ({
@@ -262,27 +285,34 @@ function blocksFor(artifact: ToolArtifact, origin: Origin): { key: string; block
               title: "مسیر پیشنهادی",
               subtitle: "ترتیب ایست‌ها با نزدیک‌ترین همسایه؛ زمان پیاده‌روی تخمینی است.",
               points: mapPoints(
-                stops.map((stop) => ({
-                  shop_id: stop.shop.shop_id,
-                  name: stop.shop.name,
-                  identity: stop.shop.identity,
-                  neighborhood: stop.shop.neighborhood,
-                  address: stop.shop.address,
-                  lat: stop.shop.lat,
-                  lon: stop.shop.lon,
-                  distance_m: stop.shop.distance_m,
-                  categories: [],
-                  website: null,
-                  instagram: null,
-                  fast_delivery: false,
-                  offer_count: 0,
-                  hours_today: null,
-                  open_now: null,
-                })),
+                stops.map((stop) => stop.shop),
                 stops.map((stop) => stop.shop.shop_id),
               ),
               origin: artifact.plan.origin,
               route_order: stops.map((stop) => stop.shop.shop_id),
+            },
+          ],
+        },
+      ];
+    }
+    case "inquiry": {
+      const offer = artifact.offer;
+      return [
+        {
+          key: `inquiry:${offer.offer_id}`,
+          blocks: [
+            {
+              type: "seller_inquiry",
+              title: `استعلام موجودی و قیمت از «${offer.shop.name}»`,
+              subtitle:
+                artifact.contacts.length > 0
+                  ? " پیام آماده برای کپی؛ ترب‌یار خودکار پیام نمی‌فرستد."
+                  : "این فروشنده راه تماس ثبت‌شده‌ی معتبر ندارد.",
+              product_id: artifact.product_id,
+              product_title: artifact.product_title,
+              offer,
+              contacts: artifact.contacts,
+              message: artifact.message,
             },
           ],
         },
@@ -382,29 +412,40 @@ export function summarize(artifacts: ToolArtifact[], origin: Origin): string {
   }
 }
 
-export function suggestionsFor(artifacts: ToolArtifact[]): string[] {
-  const last = artifacts.at(-1);
-  if (!last) return ["هدفون بی‌سیم زیر ۵ میلیون", "نزدیک‌ترین فروشگاه دوربین مدار بسته", "برنامهٔ خرید بچین"];
-  switch (last.kind) {
-    case "product":
-      return ["قیمت‌های همین کالا را مقایسه کن", "نزدیک‌ترین فروشگاه این کالا کجاست؟", "جایگزین ارزان‌تر پیشنهاد بده", "برنامهٔ خرید بچین"];
-    case "compare":
-      return ["نزدیک‌ترین فروشگاه این کالا کجاست؟", "برنامهٔ خرید بچین", "ارزان‌ترین گزینه‌ها را نشان بده"];
-    case "stores":
-      return ["برنامهٔ خرید بچین", "قیمت‌های این دسته را مقایسه کن", "فروشگاه‌های نزدیک‌تر"];
-    case "plan":
-      return ["گزینهٔ ارزان‌تر جایگزین کن", "فروشگاه‌های نزدیک‌تر", "قیمت‌ها را دوباره مقایسه کن"];
-    case "alternatives":
-      return ["این گزینه را با کالای فعلی مقایسه کن", "نزدیک‌ترین فروشگاه این کالا کجاست؟", "برنامهٔ خرید بچین"];
-    case "shop":
-      return ["قیمت‌های همین فروشگاه را ببین", "فروشگاه‌های نزدیک‌تر", "برنامهٔ خرید بچین"];
-    default:
-      return ["ارزان‌ترین گزینه‌ها را نشان بده", "قیمت‌ها را مقایسه کن", "برنامهٔ خرید بچین"];
-  }
+/**
+ * Next steps derived from the real tool results and the user's current
+ * conditions — never a fixed list. Works identically when the model is off,
+ * because it only reads what the artifacts and context carry.
+ */
+export function suggestionsFor(
+  artifacts: ToolArtifact[],
+  context: AssistantContext = {},
+): NextStep[] {
+  return contextualSuggestions({
+    intent: intentFor(artifacts),
+    artifacts,
+    context,
+    conditions: {
+      budgetMax: context.budget?.max ?? null,
+      budgetMin: context.budget?.min ?? null,
+      neighborhood: context.neighborhood ?? null,
+      radius_m: context.radius_m ?? null,
+      category: context.category ?? null,
+      sort: context.sort ?? null,
+    },
+    inquiry: context.inquiry_status
+      ? {
+          status: context.inquiry_status,
+          hasContact: hasRecordedContact(artifacts),
+          product_id: context.product_id ?? "",
+        }
+      : null,
+  });
 }
 
 export function intentFor(artifacts: ToolArtifact[]): AssistantIntent {
   const kinds = new Set(artifacts.map((artifact) => artifact.kind));
+  if (kinds.has("inquiry")) return "inquiry";
   if (kinds.has("plan")) return "plan";
   if (kinds.has("compare")) return "compare";
   if (kinds.has("alternatives")) return "alternatives";
