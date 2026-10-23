@@ -1,0 +1,8 @@
+data/hamkharid.db
+data.zip
+products.csv
+offers.csv
+shops.csv
+.venv/
+node_modules/
+.git/

@@ -9,11 +9,14 @@ products.csv
 shops.csv
 
 # Generated SQLite database and build output
-data/*.db
-data/*.db-shm
-data/*.db-wal
-dist/
+
 node_modules/
 
 *.log
 .DS_Store
+
+data/hamkharid.db
+data.zip
+products.csv
+offers.csv
+shops.csv

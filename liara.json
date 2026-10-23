@@ -1,0 +1,14 @@
+{
+    "app":"torobyar",
+    "port" : 3000,
+    "team-id" : "6acd079fc3c56dec414de82f",
+        "build":{
+        "location":"iran"
+        },
+        "disks":[
+            {
+                "name":"data",
+                "mountTo":"data/"
+        }
+    ]
+}

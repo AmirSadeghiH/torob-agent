@@ -47,8 +47,8 @@ if (isProduction) {
   });
 }
 
-app.listen(port, "127.0.0.1", () => {
-  console.log(`ترب‌یار API روی http://127.0.0.1:${port} — داده: ${path.basename(dbPath)}`);
+app.listen(port, "0.0.0.0", () => {
+  console.log(`ترب‌یار روی پورت ${port} اجرا شد`);
   if (!isProduction) {
     console.log("حالت توسعه: رابط کاربری جداگانه روی Vite اجرا می‌شود.");
   }
