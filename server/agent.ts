@@ -1,16 +1,19 @@
 import type {
   AssistantContext,
+  AssistantIntent,
   AssistantRequest,
   AssistantResponse,
   Block,
   ComparisonRow,
   InsightItem,
   MapPoint,
+  NextStep,
   OfferView,
   ProductCard,
   ProductDetail,
   SearchParams,
   StoreCard,
+  StoreRef,
 } from "../shared/types";
 import {
   allBrandNames,
@@ -28,13 +31,16 @@ import { buildPlan, planSummary } from "./plan";
 import { ageLabel, fa, faNumber, toman } from "./lib/text";
 import { distanceLabel } from "./lib/geo";
 import type { Origin } from "../shared/types";
+import { shopCapabilities } from "./capabilities";
+import { contextualSuggestions, withRequestAction, type ActionDraft, type SuggestionConditions } from "./suggestions";
+import { buildInquiryMessage, inquiryContacts } from "./inquiry";
 
 const MAX_OFFERS = 6;
 
 interface Draft {
   reply: string;
   blocks: Block[];
-  suggestions: string[];
+  suggestions: NextStep[];
   context: AssistantContext;
   intent: AssistantResponse["meta"]["intent"];
   toolCalls: string[];
@@ -103,21 +109,71 @@ function mapBlock(
   };
 }
 
-function suggestionsFor(parsed: ParsedQuery, product?: ProductDetail | null): string[] {
-  const base: string[] = [];
-  if (product) {
-    base.push("قیمت‌های همین کالا را مقایسه کن");
-    base.push("جایگزین ارزان‌تر پیشنهاد بده");
-    base.push("نزدیک‌ترین فروشگاه این کالا کجاست؟");
-    base.push("برنامهٔ خرید بچین");
-    return base.slice(0, 4);
-  }
-  const subject = parsed.category ?? parsed.q ?? "این دسته";
-  base.push(`نزدیک‌ترین فروشگاه ${subject} کجاست؟`);
-  base.push("ارزان‌ترین گزینه‌ها را نشان بده");
-  base.push("قیمت‌ها را از نظر تازگی بررسی کن");
-  base.push("برنامهٔ خرید بچین");
-  return base.slice(0, 4);
+/** Live conditions carried by the interactive panel, merged with the message. */
+function conditionsFrom(context: AssistantContext, parsed: ParsedQuery): SuggestionConditions {
+  return {
+    budgetMax: parsed.max_price ?? context.budget?.max ?? null,
+    budgetMin: parsed.min_price ?? context.budget?.min ?? null,
+    neighborhood: parsed.neighborhood ?? context.neighborhood ?? null,
+    radius_m: context.radius_m ?? null,
+    category: parsed.category ?? context.category ?? null,
+    sort: parsed.sort ?? context.sort ?? null,
+  };
+}
+
+/**
+ * Next steps from the products actually on screen and the conditions the user
+ * is shopping under. Deterministic and model-independent, so it also serves
+ * the rules fallback.
+ */
+function nextSteps(
+  intent: AssistantIntent,
+  context: AssistantContext,
+  parsed: ParsedQuery,
+  products: ProductCard[],
+  contact: boolean,
+  kind: "products" | "compare" | "stores" | "plan" | "alternatives" | "product" | "inquiry" | null = null,
+): NextStep[] {
+  return contextualSuggestions({
+    intent,
+    context,
+    conditions: conditionsFrom(context, parsed),
+    products: products.map((product) => ({
+      product_id: product.product_id,
+      title: product.title,
+      min_price: product.min_price,
+      offer_count: product.offer_count,
+      freshness: product.freshness,
+    })),
+    contact,
+    kind: kind ?? undefined,
+    inquiry: context.inquiry_status
+      ? {
+          status: context.inquiry_status,
+          hasContact: contact,
+          product_id: context.product_id ?? "",
+        }
+      : null,
+  });
+}
+
+function hasContact(cards: ProductCard[]): boolean {
+  return cards.some((card) => Boolean(card.best?.website || card.best?.instagram));
+}
+
+/** A suggestion that runs by asking the assistant a plain question. */
+function messageStep(text: string): NextStep {
+  return { label: text, action: { type: "message", text, request: text } };
+}
+
+/** The card shape the NextStep engine consumes for product actions. */
+function toCard(product: ProductDetail): ProductCard {
+  return product;
+}
+
+/** Wraps an action draft into a client-facing suggestion. */
+function step(label: string, action: ActionDraft): NextStep {
+  return { label, action: withRequestAction(action) };
 }
 
 function insightFor(product: ProductDetail): Block {
@@ -344,18 +400,32 @@ function handleSearch(parsed: ParsedQuery, origin: Origin, context: AssistantCon
             brand: parsed.brand,
             neighborhood: parsed.neighborhood,
             max_price: parsed.max_price,
+            min_price: parsed.min_price,
+            radius_m: null,
             max_age_days: null,
             min_offers: null,
             sort: parsed.sort,
           },
+          origin: origin,
+          radius_m: null,
           options: {
             categories: getMeta().categories.slice(0, 10).map((c) => c.name),
             neighborhoods: getMeta().neighborhoods.slice(0, 12).map((n) => n.name),
             brands: getMeta().brands.slice(0, 10),
           },
         },
+        {
+          type: "preference_picker",
+          title: "کدام دسته را بررسی کنیم؟",
+          question: "از میان دسته‌های موجود در دیتاست، یکی را برای جست‌وجوی تازه انتخاب کنید.",
+          options: getMeta().categories.slice(0, 6).map((category) => ({
+            key: category.name,
+            label: category.name,
+            description: `${fa(category.product_count)} کالا، ${fa(category.shop_count)} فروشگاه`,
+          })),
+        },
       ],
-      suggestions: suggestionsFor(parsed),
+      suggestions: nextSteps(parsed.intent, context, parsed, [], false, "products"),
       context: contextOut,
       intent: parsed.intent,
       toolCalls,
@@ -393,10 +463,14 @@ function handleSearch(parsed: ParsedQuery, origin: Origin, context: AssistantCon
         brand: parsed.brand,
         neighborhood: parsed.neighborhood,
         max_price: parsed.max_price,
+        min_price: parsed.min_price,
+        radius_m: null,
         max_age_days: null,
         min_offers: null,
         sort: parsed.sort,
       },
+      origin: origin,
+      radius_m: null,
       options: {
         categories: getMeta().categories.slice(0, 10).map((c) => c.name),
         neighborhoods: getMeta().neighborhoods.slice(0, 12).map((n) => n.name),
@@ -425,7 +499,7 @@ function handleSearch(parsed: ParsedQuery, origin: Origin, context: AssistantCon
   return {
     reply: parts.join(" "),
     blocks,
-    suggestions: suggestionsFor(parsed, items[0] ? getProduct(items[0].product_id, origin) : null),
+    suggestions: nextSteps(parsed.intent, context, parsed, items, hasContact(items), "products"),
     context: contextOut,
     intent: parsed.intent === "offers" ? "offers" : "search",
     toolCalls,
@@ -456,7 +530,7 @@ function handleOffers(
       blocks: [
         { type: "note", title: "کالا مشخص نیست", body: "مثلاً بنویسید «قیمت هدفون سونی WH-1000XM4».", tone: "info" },
       ],
-      suggestions: ["هدفون زیر ۵ میلیون"],
+      suggestions: [messageStep("هدفون زیر ۵ میلیون")],
       context,
       intent: parsed.intent,
       toolCalls,
@@ -475,6 +549,45 @@ function handleOffers(
       product_title: product.title,
     });
   }
+  if (best) {
+    blocks.push({
+      type: "decision_summary",
+      title: "جمع‌بندی تصمیم",
+      product_title: product.title,
+      budget: parsed.max_price ?? null,
+      best_offer_id: best.offer_id,
+      reasons: [
+        {
+          label: "کمترین قیمت",
+          value: priceOrUnknown(product.market.min),
+          tone: "good",
+          hint: best.shop.name,
+        },
+        { label: "میانهٔ بازار", value: priceOrUnknown(product.market.median), tone: "neutral" },
+        {
+          label: "تازگی",
+          value: `${fa(product.market.fresh_offers)} از ${fa(product.market.priced_offers)}`,
+          tone: product.market.fresh_offers === 0 ? "bad" : "good",
+          hint: "پیشنهادهای ثبت‌شده در ۳۰ روز گذشته",
+        },
+        {
+          label: "فاصله",
+          value: best.shop.distance_m === null ? "نامشخص" : distanceLabel(best.shop.distance_m),
+          tone: "neutral",
+          hint: "خط مستقیم تخمینی، نه مسیر خیابان",
+        },
+      ],
+      next_step:
+        best.shop.website || best.shop.instagram
+          ? "برای در دست داشتن این پیشنهاد، از فروشگاهِ راه تماسِ ثبت‌شده استفاده کنید."
+          : "برای تماس، فروشندهٔ دیگری از میان پیشنهادهای همین کالا که وب‌سایت یا اینستاگرام ثبت‌شده دارد انتخاب کنید.",
+      warnings: [
+        "قیمتها از دیتاست ثبت‌شده هستند و لزوماً قیمت روز نیستند.",
+        "این مجموعه میزان موجودی یا گارانتی را نمی‌گوید.",
+      ],
+    });
+  }
+
   const stores = product.offers
     .slice(0, 4)
     .map((offer) => storeFromOffer(offer));
@@ -493,7 +606,14 @@ function handleOffers(
   return {
     reply,
     blocks,
-    suggestions: suggestionsFor(parsed, product),
+    suggestions: nextSteps(
+      "offers",
+      context,
+      parsed,
+      [toCard(product)],
+      product.offers.some((offer) => Boolean(offer.shop.website || offer.shop.instagram)),
+      "product",
+    ),
     context: {
       ...context,
       product_id: product.product_id,
@@ -508,22 +628,29 @@ function handleOffers(
 }
 
 function storeFromOffer(offer: OfferView): StoreCard {
+  const identity = offer.shop.identity;
   return {
     shop_id: offer.shop.shop_id,
     name: offer.shop.name,
-    identity: offer.shop.identity,
+    identity,
     neighborhood: offer.shop.neighborhood,
     address: offer.shop.address,
     lat: offer.shop.lat,
     lon: offer.shop.lon,
     distance_m: offer.shop.distance_m,
+    website: offer.shop.website,
+    instagram: offer.shop.instagram,
     categories: [],
-    website: null,
-    instagram: null,
     fast_delivery: false,
     offer_count: 0,
     hours_today: null,
     open_now: null,
+    capabilities: shopCapabilities({
+      payments: [],
+      fast_delivery: false,
+      has_hours: false,
+      identity,
+    }),
   };
 }
 
@@ -564,7 +691,7 @@ function handleCompare(parsed: ParsedQuery, origin: Origin, context: AssistantCo
           tone: "info",
         },
       ],
-      suggestions: ["هدفون سونی زیر ۵ میلیون"],
+      suggestions: [messageStep("هدفون سونی زیر ۵ میلیون")],
       context,
       intent: "compare",
       toolCalls,
@@ -612,7 +739,11 @@ function handleCompare(parsed: ParsedQuery, origin: Origin, context: AssistantCo
         layout: "list",
       },
     ],
-    suggestions: ["برنامهٔ خرید بچین", "ارزان‌ترین گزینه‌ها را نشان بده", "فروشگاه‌های نزدیک را ببین"],
+    suggestions: [
+      step("برنامهٔ خرید بچین", { type: "plan" }),
+      step("ارزان‌ترین گزینه‌ها را نشان بده", { type: "search", patch: { sort: "price_asc" } }),
+      step("فروشگاه‌های نزدیک را ببین", { type: "stores", product_id: products[0]?.product_id }),
+    ],
     context: {
       ...context,
       product_id: products[0]?.product_id,
@@ -667,7 +798,10 @@ function handleStores(parsed: ParsedQuery, origin: Origin, context: AssistantCon
           tone: "warn",
         },
       ],
-      suggestions: ["فروشگاه‌های فردوسی", "همهٔ فروشگاه‌ها"],
+      suggestions: [
+        messageStep("فروشگاه‌های فردوسی"),
+        { label: "همهٔ فروشگاه‌ها", action: { type: "search", patch: { neighborhood: null }, request: "همهٔ فروشگاه‌ها" } },
+      ],
       context,
       intent: "stores",
       toolCalls,
@@ -689,7 +823,11 @@ function handleStores(parsed: ParsedQuery, origin: Origin, context: AssistantCon
       },
       mapBlock("روی نقشه", stores, origin),
     ],
-    suggestions: ["برنامهٔ خرید بچین", "قیمت‌ها را مقایسه کن", "فروشگاه‌های نزدیک‌تر"],
+    suggestions: [
+      step("برنامهٔ خرید بچین", { type: "plan" }),
+      step("قیمت‌ها را مقایسه کن", { type: "search", patch: { sort: "price_asc" } }),
+      step("فروشگاه‌های نزدیک‌تر", { type: "stores" }),
+    ],
     context: {
       origin: context.origin,
       category: parsed.category ?? context.category,
@@ -698,6 +836,34 @@ function handleStores(parsed: ParsedQuery, origin: Origin, context: AssistantCon
     intent: "stores",
     toolCalls,
     parsed: parsed.debug,
+  };
+}
+
+function planStoreCard(stop: { shop: StoreRef }): StoreCard {
+  const shop = stop.shop;
+  const identity = shop.identity;
+  return {
+    shop_id: shop.shop_id,
+    name: shop.name,
+    identity,
+    neighborhood: shop.neighborhood,
+    address: shop.address,
+    lat: shop.lat,
+    lon: shop.lon,
+    distance_m: shop.distance_m,
+    website: shop.website,
+    instagram: shop.instagram,
+    categories: [],
+    fast_delivery: false,
+    offer_count: 0,
+    hours_today: null,
+    open_now: null,
+    capabilities: shopCapabilities({
+      payments: [],
+      fast_delivery: false,
+      has_hours: false,
+      identity,
+    }),
   };
 }
 
@@ -731,7 +897,10 @@ function handlePlan(
           tone: "info",
         },
       ],
-      suggestions: ["هدفون زیر ۵ میلیون", "برنامهٔ خرید بچین"],
+      suggestions: [
+        messageStep("هدفون زیر ۵ میلیون"),
+        step("برنامهٔ خرید بچین", { type: "plan" }),
+      ],
       context,
       intent: "plan",
       toolCalls,
@@ -750,29 +919,17 @@ function handlePlan(
       { type: "plan", title: "برنامهٔ خرید حضوری", plan },
       mapBlock(
         "مسیر پیشنهادی",
-        plan.stops.map((stop) => ({
-          shop_id: stop.shop.shop_id,
-          name: stop.shop.name,
-          identity: stop.shop.identity,
-          neighborhood: stop.shop.neighborhood,
-          address: stop.shop.address,
-          lat: stop.shop.lat,
-          lon: stop.shop.lon,
-          distance_m: stop.shop.distance_m,
-          categories: [],
-          website: null,
-          instagram: null,
-          fast_delivery: false,
-          offer_count: 0,
-          hours_today: null,
-          open_now: null,
-        })),
+        plan.stops.map((stop) => planStoreCard(stop)),
         origin,
         plan.stops.map((s) => s.shop.shop_id),
       ),
       ...(note ? [{ type: "note" as const, body: note, tone: "info" as const }] : []),
     ],
-    suggestions: ["این برنامه را در سبد نگه دار", "گزینهٔ ارزان‌تر جایگزین کن", "فروشگاه‌های نزدیک‌تر"],
+    suggestions: [
+      step("این برنامه را در سبد نگه دار", { type: "plan" }),
+      step("گزینهٔ ارزان‌تر جایگزین کن", { type: "search", patch: { sort: "price_asc" } }),
+      step("فروشگاه‌های نزدیک‌تر", { type: "stores" }),
+    ],
     context: { ...context, offer_ids: plan.stops.flatMap((s) => s.items.map((i) => i.offer_id)) },
     intent: "plan",
     toolCalls,
@@ -797,7 +954,7 @@ function handleAlternatives(
     return {
       reply: "کالای مرجعی پیدا نکردم. اول یک کالا را باز کنید یا نامش را بنویسید.",
       blocks: [],
-      suggestions: suggestionsFor(parsed),
+      suggestions: nextSteps(parsed.intent, context, parsed, [], false, "alternatives"),
       context,
       intent: "alternatives",
       toolCalls,
@@ -816,7 +973,9 @@ function handleAlternatives(
           tone: "warn",
         },
       ],
-      suggestions: ["نزدیک‌ترین فروشگاه این کالا کجاست؟"],
+      suggestions: [
+        step("نزدیک‌ترین فروشگاه این کالا کجاست؟", { type: "stores", product_id: product.product_id }),
+      ],
       context: { ...context, product_id: product.product_id },
       intent: "alternatives",
       toolCalls,
@@ -841,9 +1000,157 @@ function handleAlternatives(
         layout: "grid",
       },
     ],
-    suggestions: suggestionsFor(parsed, product),
+    suggestions: nextSteps(
+      "alternatives",
+      context,
+      parsed,
+      [toCard(product), ...product.alternatives],
+      product.offers.some((offer) => Boolean(offer.shop.website || offer.shop.instagram)),
+      "alternatives",
+    ),
     context: { ...context, product_id: product.product_id, product_title: product.title },
     intent: "alternatives",
+    toolCalls,
+    parsed: parsed.debug,
+  };
+}
+
+/**
+ * Prepares a seller inquiry from a real recorded offer. The block carries the
+ * offer and the contact channels the dataset actually records; the server
+ * never invents a phone number or a WhatsApp link.
+ */
+function handleInquiry(
+  parsed: ParsedQuery,
+  origin: Origin,
+  context: AssistantContext,
+): Draft {
+  const toolCalls: string[] = [];
+  const namesNewSubject = Boolean(parsed.q || parsed.brand || parsed.category);
+  let product = !namesNewSubject && context.product_id
+    ? getProduct(context.product_id, origin)
+    : null;
+  if (!product) {
+    const search = searchProducts(
+      paramsFrom(parsed, { page_size: 3, sort: parsed.sort ?? "offers" }),
+      origin,
+    );
+    toolCalls.push("search_products");
+    const first = search.items.find((p) => p.offer_count > 0) ?? search.items[0];
+    product = first ? getProduct(first.product_id, origin) : null;
+  }
+  if (!product) {
+    return {
+      reply: "کالای مشخصی برای آماده‌کردن استعلام پیدا نکردم. نام کالا را کامل‌تر بنویسید.",
+      blocks: [
+        {
+          type: "note",
+          title: "کالا مشخص نیست",
+          body: "مثلاً بنویسید «استعلام موجودی هدفون سونی».",
+          tone: "info",
+        },
+      ],
+      suggestions: nextSteps("inquiry", context, parsed, [], false, "products"),
+      context,
+      intent: "inquiry",
+      toolCalls,
+      parsed: parsed.debug,
+    };
+  }
+  toolCalls.push("get_product");
+  const offer =
+    product.offers.find((entry) => Boolean(entry.shop.website || entry.shop.instagram)) ??
+    product.offers[0];
+  if (!offer) {
+    return {
+      reply: `برای «${product.title.slice(0, 40)}» پیشنهاد ثبت‌شده‌ی قیمتی پیدا نشد.`,
+      blocks: [
+        {
+          type: "note",
+          title: "پیشنهاد قیمتی نیست",
+          body: "برای این کالا قیمت ثبت‌شده‌ی nào در دیتاست نیست؛ از کالای دیگری استفاده کنید.",
+          tone: "warn",
+        },
+      ],
+      suggestions: nextSteps("inquiry", context, parsed, [toCard(product)], false, "products"),
+      context: { ...context, product_id: product.product_id, product_title: product.title },
+      intent: "inquiry",
+      toolCalls,
+      parsed: parsed.debug,
+    };
+  }
+
+  const contacts = inquiryContacts({
+    website: offer.shop.website,
+    instagram: offer.shop.instagram,
+  });
+  const message = buildInquiryMessage({
+    productTitle: product.title,
+    shopName: offer.shop.name,
+    price: offer.price,
+    changedAt: offer.changed_at,
+    warranty: offer.warranty,
+  });
+
+  const blocks: Block[] = [];
+  if (context.inquiry_status) {
+    // The status the user reported earlier is shown as their report, never as a
+    // Torobyar verification, and it keeps the channel open for a follow-up.
+    blocks.push({
+      type: "seller_followup",
+      title: "وضعیت گزارش‌شده از تماس قبلی",
+      subtitle: "این وضعیت از شما پرسیده شده و ترب‌یار آن را تأیید نکرده است.",
+      inquiry_id: offer.offer_id,
+      product_title: product.title,
+      shop_name: offer.shop.name,
+      price: offer.price,
+      status: context.inquiry_status,
+      note: null,
+      contacts,
+      message,
+    });
+  }
+
+  blocks.push({
+    type: "seller_inquiry",
+      title: `استعلام موجودی و قیمت از «${offer.shop.name}»`,
+      subtitle:
+        contacts.length > 0
+          ? "پیام آماده برای کپی است؛ ترب‌یار خودکار پیام نمی‌فرستد."
+          : "این فروشنده راه تماس ثبت‌شده‌ی معتبر (وب‌سایت یا اینستاگرام) ندارد.",
+      product_id: product.product_id,
+      product_title: product.title,
+      offer,
+      contacts,
+      message,
+  });
+  if (contacts.length === 0) {
+    blocks.push({
+      type: "note",
+      title: "راه تماس ثبت‌نشده",
+      body: "شماره‌ی تلفن در این دیتاست معتبر نیست و نمایش داده نمی‌شود. فروشندهٔ دیگری از میان پیشنهادهای همین کالا که وب‌سایت یا اینستاگرام ثبت‌شده دارد انتخاب کنید.",
+      tone: "warn",
+    });
+  }
+
+  const reply =
+    contacts.length > 0
+      ? `برای «${product.title.slice(0, 40)}» در «${offer.shop.name}» یک پیام استعلام آماده کردم. ترب‌یار خودکار پیام نمی‌فرستد؛ شما خودتان کانال را باز می‌کنید یا پیام را کپی می‌کنید.`
+      : `فروشندهٔ ارزان‌ترین پیشنهاد «${offer.shop.name}» راه تماس ثبت‌شده‌ی معتبر ندارد. از فروشندهٔ دیگری با وب‌سایت یا اینستاگرام ثبت‌شده استفاده کنید.`;
+
+  return {
+    reply,
+    blocks,
+    suggestions: nextSteps(
+      "inquiry",
+      context,
+      parsed,
+      [toCard(product)],
+      contacts.length > 0,
+      "inquiry",
+    ),
+    context: { ...context, product_id: product.product_id, product_title: product.title },
+    intent: "inquiry",
     toolCalls,
     parsed: parsed.debug,
   };
@@ -897,10 +1204,10 @@ function handleGreeting(origin: Origin): Draft {
       },
     ],
     suggestions: [
-      "هدفون بی‌سیم زیر ۵ میلیون",
-      "گوشی سامسونگ تا ۲۰ میلیون",
-      "نزدیک‌ترین فروشگاه دوربین مدار بسته",
-      "برنامهٔ خرید بچین",
+      messageStep("هدفون بی‌سیم زیر ۵ میلیون"),
+      messageStep("گوشی سامسونگ تا ۲۰ میلیون"),
+      messageStep("نزدیک‌ترین فروشگاه دوربین مدار بسته"),
+      step("برنامهٔ خرید بچین", { type: "plan" }),
     ],
     context: { origin },
     intent: "greeting",
@@ -922,10 +1229,10 @@ function handleHelp(origin: Origin): Draft {
       },
     ],
     suggestions: [
-      "هدفون زیر ۵ میلیون",
-      "قیمت‌ها را از نظر تازگی بررسی کن",
-      "نزدیک‌ترین فروشگاه به من",
-      "برنامهٔ خرید بچین",
+      messageStep("هدفون زیر ۵ میلیون"),
+      messageStep("قیمت‌ها را از نظر تازگی بررسی کن"),
+      messageStep("نزدیک‌ترین فروشگاه به من"),
+      step("برنامهٔ خرید بچین", { type: "plan" }),
     ],
     context: { origin },
     intent: "help",
@@ -977,6 +1284,9 @@ export async function respond(request: AssistantRequest): Promise<AssistantRespo
     case "freshness":
       draft = handleFreshness(parsed, origin, context);
       break;
+    case "inquiry":
+      draft = handleInquiry(parsed, origin, context);
+      break;
     case "unknown":
       draft = {
         reply:
@@ -990,10 +1300,10 @@ export async function respond(request: AssistantRequest): Promise<AssistantRespo
           },
         ],
         suggestions: [
-          "هدفون بی‌سیم زیر ۵ میلیون",
-          "گوشی سامسونگ تا ۲۰ میلیون",
-          "نزدیک‌ترین فروشگاه دوربین مدار بسته",
-          "برنامهٔ خرید بچین",
+          messageStep("هدفون بی‌سیم زیر ۵ میلیون"),
+          messageStep("گوشی سامسونگ تا ۲۰ میلیون"),
+          messageStep("نزدیک‌ترین فروشگاه دوربین مدار بسته"),
+          step("برنامهٔ خرید بچین", { type: "plan" }),
         ],
         context,
         intent: "unknown",

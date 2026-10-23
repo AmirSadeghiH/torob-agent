@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, describe, test } from "node:test";
+import { existsSync, statSync } from "node:fs";
+import path from "node:path";
 import {
   MapirError,
   clearMapirCache,
@@ -17,6 +19,14 @@ import { shopsByIds } from "../repo";
  * Deterministic Map.ir tests: `fetch` is replaced with a scripted handler, so
  * no provider quota or real credential is consumed.
  */
+
+/** Subtests that read real shop records skip when the dataset is not imported. */
+const dbFile = process.env.HAMKHARID_DB
+  ? path.resolve(process.env.HAMKHARID_DB)
+  : path.resolve(process.cwd(), "data", "hamkharid.db");
+const skipDb = existsSync(dbFile) && statSync(dbFile).size > 0
+  ? false
+  : "data/hamkharid.db is not imported (run npm run data:import)";
 
 const KEY = "mapir-test-key";
 const ORIGIN = { lat: 35.7008, lon: 51.4035, label: "فردوسی" };
@@ -319,7 +329,7 @@ describe("Map.ir TSP", () => {
 });
 
 describe("buildRoute with the Map.ir provider", () => {
-  test("builds a TSP-ordered driving route with provider geometry and legs", async () => {
+  test("builds a TSP-ordered driving route with provider geometry and legs", { skip: skipDb }, async () => {
     const shops = shopsByIds(SHOP_IDS).shops;
     mockFetch((url) => {
       if (url.pathname.startsWith("/vrp/tsp/v1/driving")) {
@@ -365,7 +375,7 @@ describe("buildRoute with the Map.ir provider", () => {
     );
   });
 
-  test("walking routes never call TSP and use the foot profile", async () => {
+  test("walking routes never call TSP and use the foot profile", { skip: skipDb }, async () => {
     mockFetch(() => json(routeBody({ legCount: 3 })));
     const route = await buildRoute({ shop_ids: SHOP_IDS, origin: ORIGIN, mode: "walk", optimize: true });
     assert.equal(route.optimization, "nearest");
@@ -374,14 +384,14 @@ describe("buildRoute with the Map.ir provider", () => {
     assert.equal(route.provider, "mapir");
   });
 
-  test("motorcycle falls back to the car roads and says so", async () => {
+  test("motorcycle falls back to the car roads and says so", { skip: skipDb }, async () => {
     mockFetch(() => json(routeBody({ legCount: 1 })));
     const route = await buildRoute({ shop_ids: SHOP_IDS.slice(0, 1), origin: ORIGIN, mode: "motorcycle" });
     assert.ok(calls[0].url.pathname.startsWith("/route/v1/driving"));
     assert.ok(route.warnings.some((warning) => warning.includes("موتورسیکلت")));
   });
 
-  test("return-to-origin closes the loop and requests a roundtrip TSP", async () => {
+  test("return-to-origin closes the loop and requests a roundtrip TSP", { skip: skipDb }, async () => {
     const shops = shopsByIds(SHOP_IDS).shops;
     mockFetch((url) => {
       if (url.pathname.startsWith("/vrp/tsp/v1/driving")) {
@@ -414,7 +424,7 @@ describe("buildRoute with the Map.ir provider", () => {
     assert.ok(routeCall.url.pathname.endsWith(`;${ORIGIN.lon},${ORIGIN.lat}`));
   });
 
-  test("falls back to the honest nearest order when TSP fails", async () => {
+  test("falls back to the honest nearest order when TSP fails", { skip: skipDb }, async () => {
     mockFetch((url) => {
       if (url.pathname.startsWith("/vrp/tsp/v1/driving")) return json({ code: "NoTrips" }, 400);
       return json(routeBody({ legCount: 3 }));
@@ -441,7 +451,7 @@ describe("buildRoute with the Map.ir provider", () => {
     assert.equal(calls.length, 0);
   });
 
-  test("provider failure never produces geometry and invalid input is rejected", async () => {
+  test("provider failure never produces geometry and invalid input is rejected", { skip: skipDb }, async () => {
     mockFetch(() => json({ message: "quota exceeded" }, 403));
     await assert.rejects(
       () => buildRoute({ shop_ids: SHOP_IDS.slice(0, 1), origin: ORIGIN, mode: "walk" }),
@@ -458,7 +468,7 @@ describe("buildRoute with the Map.ir provider", () => {
     );
   });
 
-  test("caches identical route requests", async () => {
+  test("caches identical route requests", { skip: skipDb }, async () => {
     mockFetch(() => json(routeBody({ legCount: 1 })));
     const body = { shop_ids: SHOP_IDS.slice(0, 1), origin: ORIGIN, mode: "walk" as const };
     await buildRoute(body);

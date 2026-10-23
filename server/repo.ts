@@ -1,4 +1,4 @@
-import { all, dbSizeMb, get, readMeta, tableCount } from "./db";
+import { all, dbReady, dbSizeMb, get, readMeta, tableCount } from "./db";
 import {
   ageDays,
   freshnessOf,
@@ -8,6 +8,7 @@ import { haversineMeters } from "./lib/geo";
 import { dayHours, openNow, tehranNow, type DayKey } from "./lib/hours";
 import { normalizeFa, shorten } from "./lib/text";
 import { hasRegistryRecord, shopDisplayName, shopIdentity } from "./lib/identity";
+import { shopCapabilities } from "./capabilities";
 import { scoreOffer, type ReliabilityInput } from "./reliability";
 import type {
   CategoryInfo,
@@ -143,6 +144,8 @@ function mapProduct(row: ProductRow, origin: Origin | null = null, now = Date.no
         age_days: ageDays(row.best_changed_at, now),
         freshness: freshnessOf(row.best_changed_at, now),
         distance_m: distanceTo(origin, row.shop_lat, row.shop_lon),
+        website: row.shop_website,
+        instagram: row.shop_instagram,
       }
     : null;
   return {
@@ -171,7 +174,20 @@ function storeRef(row: OfferRow | ShopRow, origin: Origin | null): StoreRef {
     lat: row.lat,
     lon: row.lon,
     distance_m: distanceTo(origin, row.lat, row.lon),
+    website: row.website,
+    instagram: row.instagram,
   };
+}
+
+/** Payment provider names recorded for a shop, never invented. */
+function paymentNames(raw: string | null): string[] {
+  const parsed = parseJson<{ provider_name?: unknown }[]>(raw, []);
+  return Array.isArray(parsed)
+    ? parsed
+        .map((entry) => entry?.provider_name)
+        .filter((name): name is string => typeof name === "string" && name.trim() !== "")
+        .map((name) => name.trim())
+    : [];
 }
 
 // --------------------------------------------------------------------- meta
@@ -184,8 +200,32 @@ function llmAgentConfigured(): boolean {
 
 let metaCache: Meta | null = null;
 
+/** Honest metadata when the data file has not been imported yet. */
+function notReadyMeta(): Meta {
+  return {
+    counts: {
+      products: 0,
+      offers: 0,
+      shops: 0,
+      categories: 0,
+      neighborhoods: 0,
+      comparable_products: 0,
+    },
+    categories: [],
+    neighborhoods: [],
+    brands: [],
+    default_origin: { lat: 35.7005, lon: 51.4195, label: "فردوسی", neighborhood: "فردوسی" },
+    data: { imported_at: null, price_newest: null, price_oldest: null, priced_offers: 0 },
+    assistant: {
+      engine: "rules",
+      note: "داده هنوز ایمپورت نشده است؛ بعد از اجرای «npm run data:import» جست‌وجوهای واقعی اجرا می‌شود.",
+    },
+  };
+}
+
 export function getMeta(): Meta {
   if (metaCache) return metaCache;
+  if (!dbReady()) return notReadyMeta();
   const categories = all<{ name: string; product_count: number; shop_count: number }>(
     `SELECT name, product_count, shop_count FROM categories
      WHERE product_count > 0 OR shop_count > 0
@@ -582,6 +622,8 @@ export function getProduct(productId: string, origin: Origin | null = null): Pro
       age_days: offers[0].age_days,
       freshness: offers[0].freshness,
       distance_m: offers[0].shop.distance_m,
+      website: offers[0].shop.website,
+      instagram: offers[0].shop.instagram,
     };
   }
 
@@ -653,22 +695,30 @@ function mapStore(row: ShopRow, origin: Origin | null, now = new Date()): StoreC
   const hoursRaw = parseJson<Record<string, unknown>>(row.hours, {});
   const { day, minutes } = tehranNow(now);
   const today = dayHours(hoursRaw, day);
+  const payments = paymentNames(row.payments);
+  const identity = shopIdentity(row.website, row.instagram);
   return {
     shop_id: row.shop_id,
     name: shopDisplayName(row.shop_id, row.name, hasRegistryRecord(row.website, row.instagram)),
-    identity: shopIdentity(row.website, row.instagram),
+    identity,
     neighborhood: row.neighborhood,
     address: row.address,
     lat: row.lat,
     lon: row.lon,
     distance_m: distanceTo(origin, row.lat, row.lon),
-    categories: parseJson<string[]>(row.categories, []).slice(0, 6),
     website: row.website,
     instagram: row.instagram,
+    categories: parseJson<string[]>(row.categories, []).slice(0, 6),
     fast_delivery: row.fast_delivery === 1,
     offer_count: row.offer_count,
     hours_today: today,
     open_now: openNow(today, minutes),
+    capabilities: shopCapabilities({
+      payments,
+      fast_delivery: row.fast_delivery === 1,
+      has_hours: Boolean(hoursRaw) && Object.keys(hoursRaw).length > 0,
+      identity,
+    }),
     matched_offers: row.matched_offers,
   };
 }
@@ -889,6 +939,8 @@ export function offersForPlan(ids: string[], origin: Origin | null): PlanOfferRo
         lat: r.lat,
         lon: r.lon,
         distance_m: distanceTo(origin, r.lat, r.lon),
+        website: r.website,
+        instagram: r.instagram,
       },
     }));
 }
@@ -995,6 +1047,9 @@ export function neighborhoodList(): NeighborhoodInfo[] {
 }
 
 export function dbHealth() {
+  if (!dbReady()) {
+    return { size_mb: null as number | null, ready: false, imported_at: null };
+  }
   return {
     size_mb: dbSizeMb(),
     ready: tableCount("products") > 0,

@@ -152,6 +152,7 @@ const RE = {
   stores: /(فروشگاه|مغازه|کجا بخرم|کجا پیدا|کجا هست|جایی هست|جایی داره|کجا بگیرم)/,
   alternatives: /(جایگزین|مشابه|ارزونتر از این|ارزانتر از این|بهتر از این|چیز دیگه|چیزی دیگه)/,
   freshness: /(تازه|قدیمی|اپدیت|آپدیت|به روز|بروز|کی تغییر|آخرین تغییر|اعتبار)/,
+  inquiry: /(استعلام|پرسش|بپرس|پرسون|خبر|تماس|ارتباط|رسان|قیمت روز|قیمت فعلی|وجود دارد|پاسخ نداده|پاسخی نداد|جواب نداده)/,
   offers: /(قیمت|چند|هزینه|ارزون|ارزان|گرون|گران|موجود)/,
 };
 
@@ -334,6 +335,7 @@ export function parseMessage(
   else if (RE.alternatives.test(text)) intent = "alternatives";
   else if (RE.nearby.test(text) || RE.stores.test(text)) intent = "stores";
   else if (RE.freshness.test(text)) intent = "freshness";
+  else if (RE.inquiry.test(text)) intent = "inquiry";
   else if (RE.offers.test(text) && (context.product_id || brandMatch)) intent = "offers";
 
   if (intent === "offers" && !context.product_id && !brandMatch && !categoryMatch) {
